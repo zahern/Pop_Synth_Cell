@@ -1,0 +1,110 @@
+\FloatBarrier
+\subsection{Development Audit of Pool Expansion}
+\label{sec:pool_expansion_audit}
+
+The purpose of the pool-expansion audit is operational rather than
+probabilistic. It asks whether the module can turn zero-capacity control cells
+into selectable households under the released defaults, how many records it
+needs to do so, and whether the selected records satisfy the same rule set as
+the rest of the pool. It does not claim that every emitted record is realised
+in the census, nor that the expansion closes the zone's full deficit; those are
+questions for the zone fit and the validation tables.
+
+\paragraph{Setting}
+The audit uses ten SA2 zones from the SEQ case study, the CP feasible pool
+(1{,}396{,}307 rows), the 1{,}252{,}479-row census extract, and the released
+defaults: \texttt{rep\_max}~$=40$, at most 64 households and 256 persons added
+per zone, four donors per zero cell, and a 30-second limit per selection MIP.
+The selection model is \eqref{eq:mip_joint}. A cell is a \emph{zero cell} when
+its census target is positive and its attainable capacity in the zone's
+candidate pool is zero; cells with positive but insufficient capacity are
+partial deficits and are left to the zone fitter, which can replicate a
+candidate up to \texttt{rep\_max}.
+
+\paragraph{Coverage}
+Of 146 deficient control cells across the ten zones, 123 were zero-capacity and
+23 were partial. The module generated donor--shell candidates for 70 of the 73
+sourceable zero cells and the joint selection covered all 70. The remaining 53
+zero cells were not filled: 40 belong to four control codes that are absent from
+the census extract (\texttt{hrsp:101}, \texttt{hrsp:103}, \texttt{qalfp:16},
+\texttt{strd:9}), 10 are the \texttt{tend:6} padding code, and three are
+\texttt{tenlld:11} cells for which no donor--shell candidate survived the
+household and rule checks. The first 50 are cells the current policy treats as absent or padding
+rather than as donor shortages; the last three identify a candidate-generation
+gap rather than a structural zero. Counting only cells the current policy treats as sourceable,
+coverage is 70/73 (95.9\%); treating \texttt{tend:6} as sourceable as well gives
+70/83 (84.3\%). Table~\ref{tab:pool_expansion_audit} gives the per-zone result.
+
+\paragraph{Selected records}
+The joint selection chose 14 households containing 18 person rows across the
+ten zones---one or two households per zone, and never more than three persons.
+This is well inside the 64-household and 256-person budgets: once every
+sourceable zero cell is covered, the marginal term does not justify adding more
+records, and the selection stops. All ten MIPs returned an optimal solution.
+Every selected row passed the 11 shared \texttt{CONSTRAINT\_CHECKS}; the added
+households have 14 unique identifiers, no shell household received more than one
+transplant, and the output grew from 1{,}396{,}307 to 1{,}396{,}325 rows.
+Attributes outside the person-level model were carried by the shell or by a
+verbatim donor household, not repaired.
+
+\paragraph{Joint-marginal deviation}
+For each zone the weighted deviation
+$\sum_{k,m}w_{k,m}d_{k,m}$ of the selected set ranged from 0.239 to 1.622
+(median 0.406), and the unweighted mean absolute cell deviation from 0.126 to
+0.280 (median 0.147); the largest single-cell deviation in a zone ranged from
+0.998 to 1.931. These are deviations of the added set from the zone's target
+shares, not measures of the fitted zone population. Because the added set
+contains only one to three persons per zone, a single person can move a cell
+share by a large amount; the values are reported to make the joint trade-off
+visible, not to claim that an 18-person addition reproduces the zone marginals.
+The joint model is doing what it is intended to do: it chooses one set that pays
+every table's deviation against coverage and against the household count,
+rather than repairing each zero cell independently.
+
+\paragraph{What the audit supports}
+The audit supports three operational claims. First, the mechanism fills zero
+cells that the CP pool cannot supply: all 70 sourceable cells with an accepted
+candidate were covered, and the selected records are rule-feasible. Second, it
+does so with a very small added set---14 households and 18 persons, far below
+the budget---so feasibility is achieved without forcing the pool to reproduce
+the census shortfall. Third, the failures are legible: 50 of the 53 residual
+cells are absent or padding codes, and the other three are a specific
+donor--shell case to fix. It does not support a claim that every zero cell is
+fillable, that the added records are realised in the census, or that the zone
+fit is improved by the expansion alone. Those claims require the zone-level
+fitting and validation reported in the main text.
+
+\begin{table}[h!]
+\centering
+\caption{Ten-zone development audit of pool expansion under the released
+defaults. \emph{Zero} is the number of positive-target control cells with zero
+attainable capacity; \emph{cov.} is the number covered by the selected set;
+\emph{HH} and \emph{persons} are the selected added records; \emph{dev.} is the
+weighted joint-marginal deviation
+$\sum_{k,m}w_{k,m}d_{k,m}$ (lower is better). All ten selection programs
+returned an optimal solution; the audit took 1{,}013.5 seconds for the ten
+zones. The 53 uncovered cells are 40 cells in four census-absent codes, 10
+cells in the \texttt{tend:6} padding code, and three \texttt{tenlld:11} cases
+with no valid candidate.}
+\label{tab:pool_expansion_audit}
+\small
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Zone & Zero & Cov. & HH & Persons & Dev. \\
+\midrule
+112011236 & 13 & 8 & 2 & 3 & 1.113 \\
+112011237 & 13 & 7 & 2 & 2 & 0.239 \\
+112011238 & 11 & 6 & 1 & 1 & 0.458 \\
+112011239 & 12 & 7 & 1 & 1 & 0.309 \\
+112011240 & 13 & 8 & 2 & 3 & 0.355 \\
+112011241 & 11 & 6 & 1 & 1 & 0.341 \\
+112011242 & 13 & 7 & 1 & 1 & 0.827 \\
+112011243 & 12 & 7 & 1 & 1 & 0.772 \\
+112021244 & 13 & 8 & 2 & 3 & 1.622 \\
+112021245 & 12 & 6 & 1 & 2 & 0.288 \\
+\midrule
+Total  & 123 & 70 & 14 & 18 & 6.326 \\
+Median & 12  & 7  & 1  & 1  & 0.406 \\
+\bottomrule
+\end{tabular}
+\end{table}

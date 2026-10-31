@@ -1,0 +1,113 @@
+#!/bin/bash -l
+#PBS -N synth_s11_figs
+#PBS -l walltime=02:00:00
+#PBS -l select=1:ncpus=4:mem=48GB
+#PBS -j n
+#PBS -m abe
+#PBS -r y
+
+# =============================================================================
+# Stage 11 only — paper figures update (copy PNGs -> paper LaTeX folder)
+# =============================================================================
+# Re-run of the tail end of stage5_post_analysis.pbs after fixing the
+# int() crash in paper_figures.py::plot_validation_controls (text category
+# labels like "Overseas visitor" are now mapped via _category_to_code()).
+# Stages 7-10 already completed successfully in job 23352187.aqua, so this
+# only re-runs stage 11.
+
+set -euo pipefail
+
+_fail() {
+  local line="$1" cmd="$2" rc="$3"
+  echo ""
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  echo "  STAGE 11 FAILED"
+  echo "  Line      : $line"
+  echo "  Command   : $cmd"
+  echo "  Exit code : $rc"
+  echo "  Time      : $(date)"
+  echo "  Job ID    : ${PBS_JOBID:-local}"
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  exit "$rc"
+}
+trap '_fail $LINENO "$BASH_COMMAND" $?' ERR
+
+run_py() {
+  local script="$1"; shift
+  echo ""
+  echo ">>> [$(date '+%H:%M:%S')]  ${PYTHON_BIN} -u $script $*"
+  "${PYTHON_BIN}" -u "$script" "$@"
+  local rc=$?
+  if [[ $rc -ne 0 ]]; then
+    echo "<<< [$(date '+%H:%M:%S')]  $script  failed (exit ${rc})"
+    return "$rc"
+  fi
+  echo "<<< [$(date '+%H:%M:%S')]  $script  finished (exit 0)"
+}
+
+echo "================================================================"
+echo "  Stage 11 — paper figures update"
+echo "  Host   : $(hostname)"
+echo "  Job ID : ${PBS_JOBID:-local}"
+echo "  Start  : $(date)"
+echo "================================================================"
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+cd "$SYNTH_POP"
+echo "Working dir: $(pwd)"
+
+# ---------------------------------------------------------------------------
+# Environment setup
+# ---------------------------------------------------------------------------
+module purge
+module load Anaconda3/2024.02-1
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+export USE_HPC=1
+
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+
+if [[ ! -x "$PYTHON_BIN" ]]; then
+  echo "ERROR: Expected Python interpreter not found: $PYTHON_BIN"
+  exit 1
+fi
+
+echo ""
+echo "--- Environment ---"
+echo "Python    : $PYTHON_BIN"
+echo "Python ver: $($PYTHON_BIN --version 2>&1)"
+echo "Conda env : ${CONDA_DEFAULT_ENV:-unknown}"
+df -h /home/ahernz 2>/dev/null || df -h "$SYNTH_POP"
+
+echo ""
+echo "================================================================"
+echo "  Running run_pipeline.py stage 11 only  [$(date)]"
+echo "================================================================"
+echo "  Stages 7-10 already completed in job 23352187.aqua — not re-run here."
+echo "  Stage 11 = Paper figures update (copy PNGs -> paper LaTeX folder)"
+echo "================================================================"
+
+run_py run_pipeline.py --only 11
+
+echo ""
+echo "--- Key paper figures ---"
+echo "Paper figures (stage 11 output):"
+ls -lh "$SYNTH_POP/outputs/paper_figures/"*.png 2>/dev/null || echo "  (none found)"
+echo ""
+PAPER_DIR="$(dirname "$SYNTH_POP")/Population_Synthesiser___GAN_SA"
+if [[ -d "$PAPER_DIR" ]]; then
+  echo "Paper LaTeX folder — PNGs copied:"
+  ls -lh "$PAPER_DIR/"*.png 2>/dev/null | tail -20 || echo "  (none found)"
+else
+  echo "Paper LaTeX folder not found at: $PAPER_DIR"
+  echo "  (This is OK on HPC — copy outputs/paper_figures/ to Windows manually)"
+fi
+
+echo ""
+echo "================================================================"
+echo "  Stage 11 COMPLETE"
+echo "  End: $(date)"
+echo "================================================================"

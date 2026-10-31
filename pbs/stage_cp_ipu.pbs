@@ -1,0 +1,33 @@
+#!/bin/bash -l
+#PBS -N synth_cp_ipu
+#PBS -l walltime=48:00:00
+#PBS -l select=1:ncpus=1:mem=32GB
+#PBS -j oe
+#PBS -m abe
+#PBS -r y
+
+# CP-IPU: the CP-feasible candidate pool fitted with the shared IPU runner.
+set -euo pipefail
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export USE_HPC=1
+
+if [[ -n "${CHUNK_ID:-}" ]]; then
+  CHUNK_FILE="$SYNTH_POP/pbs/zone_chunks/chunk_${CHUNK_ID}.txt"
+  [[ -s "$CHUNK_FILE" ]] || { echo "Missing chunk file: $CHUNK_FILE"; exit 1; }
+  ZONE_ARGS=(--zones $(tr '\n' ' ' < "$CHUNK_FILE"))
+else
+  ZONE_ARGS=()
+fi
+
+cd "$SYNTH_POP"
+"$PYTHON_BIN" -u cp_pool_ipu.py \
+  --pool "${POOL_OVERRIDE:-}" \
+  --max-iter "${SA_ITER:-1000}" \
+  --control-scope "${SA_CONTROL_SCOPE:-statewide}" \
+  "${ZONE_ARGS[@]}"

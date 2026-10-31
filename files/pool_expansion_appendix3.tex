@@ -1,0 +1,65 @@
+\FloatBarrier
+\subsection{Candidate-Pool Expansion: Demonstration}
+\label{sec:pool_expansion_audit}
+
+The two programs used by the candidate-pool expansion are Eqs.~\eqref{eq:mip_repair}
+and~\eqref{eq:mip_joint} of Section~\ref{sec:mip_pool_expansion}: a per-candidate
+repair that keeps as much of the real donor profile as the structural rules allow,
+and a single binary selection program per zone that covers every sourceable
+zero-capacity cell while keeping the added set's deviation from the zone's target
+shares small. The released defaults are a 64-household and 256-person budget per
+zone, coverage weight $\lambda_0=10^{5}$ and marginal weight $\lambda_1=10^{-2}$;
+over the 256-person budget the whole marginal term stays below about
+$2.6\times10^{4}$, so opening a sourceable cell always outranks any marginal gain
+the added set could buy. Coverage is soft through the slack $e_c$, so a cell that no
+donor can source is reported rather than making the program infeasible.
+
+Table~\ref{tab:pool_expansion_audit} reports the ten-zone demonstration. The
+demonstration is a mechanism check on a subset of zones under one fixed set of
+parameters; it establishes that the step can fill the sourceable zero cells with a
+small number of feasible records, not that it closes any zone's full deficit, which
+is a question for the zone fit and the validation tables. Of 123 zero-capacity
+cells, 70 of the 73 sourceable cells received a feasible candidate and all 70 were
+covered, with 14 households (18 persons) selected in total and every selection
+program solving to optimality. The weighted marginal deviation of the \emph{added
+set} ranged from 0.239 to 1.622 (median 0.406); because each zone's addition is only
+one to three persons, a single person can move a cell share substantially, so this
+figure describes the added set, not the fitted zone population. The 53 uncovered
+cells split into 40 in four categories absent from the census extract, ten in a
+padding code, and three for which no donor--shell candidate survived the household
+and rule checks---the first fifty are treated by the current parameters as absent or
+padding, and the last three identify a candidate-generation gap rather than a
+structural zero.
+
+\begin{table}[h!]
+\centering
+\caption{Ten-zone demonstration of candidate-pool expansion. \emph{Zero} is the
+number of positive-target control cells with zero attainable capacity;
+\emph{Cov.} the number covered by the selected set; \emph{HH} and \emph{Persons}
+the added records; \emph{Dev.} the weighted marginal deviation of the added set
+(lower is better). All ten selection programs returned an optimal solution. The
+53 uncovered cells are 40 in census-absent codes, ten in a padding code, and
+three with no feasible donor--shell candidate.}
+\label{tab:pool_expansion_audit}
+\small
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Zone & Zero & Cov. & HH & Persons & Dev. \\
+\midrule
+112011236 & 13 & 8 & 2 & 3 & 1.113 \\
+112011237 & 13 & 7 & 2 & 2 & 0.239 \\
+112011238 & 11 & 6 & 1 & 1 & 0.458 \\
+112011239 & 12 & 7 & 1 & 1 & 0.309 \\
+112011240 & 13 & 8 & 2 & 3 & 0.355 \\
+112011241 & 11 & 6 & 1 & 1 & 0.341 \\
+112011242 & 13 & 7 & 1 & 1 & 0.827 \\
+112011243 & 12 & 7 & 1 & 1 & 0.772 \\
+112021244 & 13 & 8 & 2 & 3 & 1.622 \\
+112021245 & 12 & 6 & 1 & 2 & 0.288 \\
+\midrule
+Total  & 123 & 70 & 14 & 18 & 6.326 \\
+Median & 12  & 7  & 1  & 1  & 0.406 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\FloatBarrier

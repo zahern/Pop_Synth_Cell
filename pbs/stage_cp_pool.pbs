@@ -1,0 +1,104 @@
+#!/bin/bash -l
+#PBS -N synth_cp_pool
+#PBS -l walltime=24:00:00
+#PBS -l select=1:ncpus=4:mem=190GB
+#PBS -j n
+#PBS -m abe
+#PBS -r y
+
+# =============================================================================
+# Stage CP-pool — fuse national census + build constraint-programming pool
+# =============================================================================
+# Independent of the GAN (runs in parallel with Stage 1).  Produces:
+#   $CENSUS_DIR/LINKED_DATA_national.csv        (national fused census)
+#   $SYNTH_POP/outputs/feasible_pool.csv         (CP feasible pool)
+#
+# Env vars: SYNTH_POP, CENSUS_DIR, WITH_HHTS, HHTS_DIR
+
+set -euo pipefail
+
+_fail() {
+  local line="$1" cmd="$2" rc="$3"
+  { echo ""; echo "  STAGE CP-POOL FAILED  (line $line, cmd $cmd, rc $rc)"; } | tee /dev/stderr
+  exit "$rc"
+}
+trap '_fail $LINENO "$BASH_COMMAND" $?' ERR
+
+run_py() {
+  local script="$1"; shift
+  echo ""
+  echo ">>> [$(date '+%H:%M:%S')]  ${PYTHON_BIN} -u $script $*"
+  "${PYTHON_BIN}" -u "$script" "$@"
+  local rc=$?
+  if [[ $rc -ne 0 ]]; then echo "<<< $script failed (exit $rc)"; return "$rc"; fi
+  echo "<<< [$(date '+%H:%M:%S')]  $script finished (exit 0)"
+}
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+
+# ---- paper hold-out basis (19 in-sample tables) --------------------------
+# The live data_sa2_controls directory also holds the 7 held-out tables; fitting
+# from it would optimise against them. Build and use the 19-table directory.
+PAPER19="${PAPER19:-$SYNTH_POP/data_sa2_controls_paper19}"
+if [ ! -d "$PAPER19" ] || [ "$(ls -1 "$PAPER19"/*.csv 2>/dev/null | wc -l)" -lt 19 ]; then
+  mkdir -p "$PAPER19"
+  for t in indp sexp typp mtwp occp mstp incp stup rlhp hrsp heap qallp qalfp \
+           rntrd mrerd vehrd nprd hind strd; do
+    cp -f "$SYNTH_POP/data_sa2_controls/sa2${t}.csv" "$PAPER19/" 2>/dev/null || true
+  done
+fi
+export SA_CONTROL_DIR="$PAPER19"
+echo "  control basis: $SA_CONTROL_DIR ($(ls -1 "$SA_CONTROL_DIR"/*.csv 2>/dev/null | wc -l) tables)"
+
+CENSUS_DIR="${CENSUS_DIR:-/home/ahernz/Population_Synth}"
+HHTS_DIR="${HHTS_DIR:-/home/ahernz/test_runs_tours}"
+
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+export USE_HPC=1
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+
+echo "================================================================"
+echo "  Stage CP-pool — national fusion + CP feasible pool"
+echo "  Host : $(hostname)   Job : ${PBS_JOBID:-local}   Start : $(date)"
+echo "================================================================"
+
+# ---- 1. Fuse national census (+ optional HHTS) ----
+FUSE_ARGS=(--source "$CENSUS_DIR" --write-category-map)
+if [[ "${WITH_HHTS:-0}" == "1" ]]; then
+  FUSE_ARGS+=(--with-hhts --match-method pmm --evaluate-match --hhts-dir "$HHTS_DIR")
+fi
+( cd "$CENSUS_DIR" && run_py step_0b_fuse_national.py "${FUSE_ARGS[@]}" )
+CENSUS_CSV="$CENSUS_DIR/LINKED_DATA_national.csv"
+[[ -f "$CENSUS_CSV" ]] || { echo "ERROR: $CENSUS_CSV not created"; exit 1; }
+
+# ---- 2. Build the constraint-programming feasible pool ----
+CONTROL_ATTRS="SEXP AGEP MSTP HEAP OCCP INCP LFSP EMPP HRSP QALFP QALLP RLHP MTWP NPRD VEHRD MRERD RNTRD STRD HIND BEDRD HHCD"
+# Household-atomic infill appends WHOLE donor households, so rows = draws x mean
+# household size (~2.5). target_per_cell=20 over 60k thin cells produced ~2.7M
+# rows and OOM-killed the job at 96GB (exit 137, Oct-25). 5 per cell still fills
+# every sampling zero, and the MIP now replicates households, so pool scale is
+# no longer needed to reach a zone's population.
+CP_TARGET_PER_CELL="${CP_TARGET_PER_CELL:-5}"
+CP_MAX_INFILL_CELLS="${CP_MAX_INFILL_CELLS:-30000}"
+( cd "$SYNTH_POP" && run_py build_feasible_pool_cp.py \
+    --census "$CENSUS_CSV" --control-attrs $CONTROL_ATTRS \
+    --min-count 5 --target-per-cell "$CP_TARGET_PER_CELL" \
+    --max-infill-cells "$CP_MAX_INFILL_CELLS" \
+    --coverage-tables --coverage-per-category "${CP_COVERAGE_PER_CATEGORY:-5}" \
+    --out "$SYNTH_POP/outputs/feasible_pool.csv" )
+
+# Alias copy: cp_pool_sa.py defaults to outputs/cp_pool_results/cp_feasible_pool.csv.
+# Keep both names in sync so stage_cp_mip finds the pool regardless of which
+# path convention the caller uses.
+mkdir -p "$SYNTH_POP/outputs/cp_pool_results"
+cp -f "$SYNTH_POP/outputs/feasible_pool.csv" "$SYNTH_POP/outputs/cp_pool_results/cp_feasible_pool.csv" 2>/dev/null || true
+
+echo ""
+echo "  Stage CP-pool COMPLETE"
+echo "    $CENSUS_CSV"
+echo "    $SYNTH_POP/outputs/feasible_pool.csv"
+echo "    $SYNTH_POP/outputs/cp_pool_results/cp_feasible_pool.csv (alias)"

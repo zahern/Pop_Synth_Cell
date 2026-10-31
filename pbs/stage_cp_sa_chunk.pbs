@@ -1,0 +1,95 @@
+#!/bin/bash -l
+#PBS -N synth_cp_sa_chunk
+#PBS -l walltime=48:00:00
+#PBS -l select=1:ncpus=4:mem=64GB
+#PBS -j n
+#PBS -m abe
+#PBS -r y
+
+# =============================================================================
+# Stage CP-SA chunk — SA baseline over a zone subset of the CP feasible pool.
+#
+# Why this exists (Oct-2026): stage_cp_sa_only.pbs ran all ~371 zones in ONE
+# 24h job and was SIGKILLed at the walltime limit (job 26593125, Exit_status -29,
+# "PBS: job killed: walltime 86424 exceeded limit 86400") after only 21 zones,
+# dying mid-zone on 112031552.  At ~1.14 h/zone that is ~17 days of serial
+# walltime for full coverage.  This chunked variant mirrors stage_cp_mip_chunk.pbs:
+# the submitter passes ZONES inline, CHUNK_ID is used only as a filename suffix
+# so concurrent jobs do not clobber each other's summary.
+#
+# cp_pool_sa.py already names its summary cp_pool_rssz_summary_chunk<ID>.csv
+# when CHUNK_ID is set in the environment, so no per-chunk copy is needed here.
+#
+# Env vars: SYNTH_POP, CENSUS_DIR, CHUNK_ID, ZONES, SA_ITER,
+#           CPU_ENV_NAME, CPU_ENV_PREFIX
+# =============================================================================
+
+set -euo pipefail
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+
+# ---- paper hold-out basis (19 in-sample tables) --------------------------
+# The live data_sa2_controls directory also holds the 7 held-out tables; fitting
+# from it would optimise against them. Build and use the 19-table directory.
+PAPER19="${PAPER19:-$SYNTH_POP/data_sa2_controls_paper19}"
+if [ ! -d "$PAPER19" ] || [ "$(ls -1 "$PAPER19"/*.csv 2>/dev/null | wc -l)" -lt 19 ]; then
+  mkdir -p "$PAPER19"
+  for t in indp sexp typp mtwp occp mstp incp stup rlhp hrsp heap qallp qalfp \
+           rntrd mrerd vehrd nprd hind strd; do
+    cp -f "$SYNTH_POP/data_sa2_controls/sa2${t}.csv" "$PAPER19/" 2>/dev/null || true
+  done
+fi
+export SA_CONTROL_DIR="$PAPER19"
+echo "  control basis: $SA_CONTROL_DIR ($(ls -1 "$SA_CONTROL_DIR"/*.csv 2>/dev/null | wc -l) tables)"
+
+CENSUS_DIR="${CENSUS_DIR:-/home/ahernz/Population_Synth}"
+SA_ITER="${SA_ITER:-1000}"
+CHUNK_ID="${CHUNK_ID:-0}"
+
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+export USE_HPC=1
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+
+# CHUNK_ID must be exported: cp_pool_sa.py reads os.environ to decide whether to
+# write a per-chunk summary instead of the shared one.
+export CHUNK_ID
+
+CENSUS_CSV="$CENSUS_DIR/LINKED_DATA_national.csv"
+[[ -f "$CENSUS_CSV" ]] || { echo "ERROR: $CENSUS_CSV not created"; exit 1; }
+[[ -n "${ZONES:-}" ]] || { echo "ERROR: ZONES is empty for chunk ${CHUNK_ID}"; exit 1; }
+
+N_ZONES=$(echo "$ZONES" | wc -w)
+echo "================================================================"
+echo "  Stage CP-SA chunk ${CHUNK_ID}  (${N_ZONES} zones)"
+echo "  Host : $(hostname)   Job : ${PBS_JOBID:-local}   Start : $(date)"
+echo "  Zones: $ZONES"
+echo "================================================================"
+
+# shellcheck disable=SC2086
+"$PYTHON_BIN" -u "$SYNTH_POP/cp_pool_sa.py" \
+        --census "$CENSUS_CSV" --pool "${POOL_OVERRIDE:-$SYNTH_POP/outputs/feasible_pool.csv}" \
+        --max-iter "$SA_ITER" --zones $ZONES \
+        --results-dir "${RESULTS_DIR:-$SYNTH_POP/outputs/cp_pool_results/chunk_${CHUNK_ID}}"
+
+# --- Completion marker -------------------------------------------------------
+# stage_cp_sa_only.pbs wrote no marker and had no set -e failure trap, so a
+# SIGKILLed run was indistinguishable from a clean one.  Write the marker only
+# after python has exited 0.
+MARK_DIR="$SYNTH_POP/outputs/cp_pool_results/.done"
+mkdir -p "$MARK_DIR"
+SUM="${RESULTS_DIR:-$SYNTH_POP/outputs/cp_pool_results/chunk_${CHUNK_ID}}/cp_pool_rssz_summary_chunk${CHUNK_ID}.csv"
+{
+  echo "chunk_id=${CHUNK_ID}"
+  echo "zones=${N_ZONES}"
+  echo "finished=$(date -Is)"
+  echo "summary=${SUM}"
+  echo "summary_exists=$([[ -f "$SUM" ]] && echo yes || echo no)"
+  echo "rows=$(( $(wc -l < "$SUM" 2>/dev/null || echo 1) - 1 ))"
+} > "$MARK_DIR/cp_sa_chunk${CHUNK_ID}.done"
+
+echo "  marker : $MARK_DIR/cp_sa_chunk${CHUNK_ID}.done"
+echo "  CHUNK ${CHUNK_ID} COMPLETE : $(date)"

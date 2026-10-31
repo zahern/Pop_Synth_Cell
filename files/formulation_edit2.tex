@@ -1,0 +1,150 @@
+%% formulation_edit2.tex  -- CORRECTED formulation (revision 2)
+%% Changes vs formulation_edit.tex (round-1 version), addressing Reviewer 2 (R2)
+%% and Reviewer 3 (R3):
+%%   - C1: added the missing sum over individuals; zone target renamed P_z.
+%%   - C3: introduced an explicit membership indicator 1[A_{i,k}=m]; separated the
+%%         counting identity (O in terms of x) from the tolerance bound.
+%%   - C4 (old "joint distribution consistency") removed; its tolerance bound is
+%%         folded into C3, eliminating the "observed vs expected" ambiguity (R3).
+%%   - C5 (old pair constraint): re-expressed as a construction-level feasibility
+%%         condition, not an SA constraint; J_{i,k}/J_{i,k'}/f(K) notation dropped.
+%%   - C6 (household composition): split into two independent equations (per-person
+%%         assignment + household capacity) -- R2 noted it wrongly summed over both
+%%         indices.
+%%   - tol_{k,m}: value stated (0.05); clarified that it is a fit/stopping criterion
+%%         and does NOT enter the Metropolis acceptance rule (R2).
+%%   - RSSZ: zone subscript added (R3).
+
+\subsection{Notation}
+% \tag{FORM-NOTATION-START}
+\begin{longtable}{|c|p{10cm}|}
+\hline
+\textbf{Symbol/Notation} & \textbf{Description} \\ \hline
+\endfirsthead
+
+\hline
+\textbf{Symbol/Notation} & \textbf{Description} \\ \hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\caption{Table with Notation for Problem Formulation} \\
+\endlastfoot
+
+\( T \) & Original tabular microdata containing both continuous and discrete variables. \\ \hline
+\( n_c \) & Number of continuous variables in \( T \). \\ \hline
+\( \{C_1, \dots, C_{n_c}\} \) & Set of continuous random variables in \( T \). \\ \hline
+\( n_d \) & Number of discrete variables in \( T \). \\ \hline
+\( \{D_1, \dots, D_{n_d}\} \) & Set of discrete random variables in \( T \). \\ \hline
+\( P(C_1, \dots, C_{n_c}, D_1, \dots, D_{n_d}) \) & Joint distribution over the continuous and discrete variables of \( T \), estimated from the observed conditional distributions of the microdata. \\ \hline
+\( T_{\text{pool}} \) & Feasible candidate pool: observed census records plus records constructed from observed conditionals under the structural rules, optionally extended by mixed-integer expansion. \\ \hline
+\( \mathcal{C} \) & Set of category pairs forbidden by the structural rules $\mathcal{R}$ (Appendix~\ref{sec:ref}), used as cuts in the expansion program. \\ \hline
+\( \mathcal{Z} \) & Set of spatial zones. \\ \hline
+\( z \) & Index of spatial zones in the target region. \\ \hline
+\( h \) & Index of households in the candidate pool. \\ \hline
+\( \mathcal{I} \) & Set of individuals in the candidate pool. \\ \hline
+\( \mathcal{K} \) & Set of marginal control tabulations. \\ \hline
+\( k \) & Index of tabulations (characteristics/constraints). \\ \hline
+\( m \) & Index of a cell (category) within a tabulation. \\ \hline
+\( x_{i,h} \) & Binary decision variable: \( x_{i,h}=1 \) if individual \( i \) is assigned to household \( h \), 0 otherwise. \\ \hline
+\( H_{h,z} \) & Household size (number of persons) of household \( h \) in zone \( z \). \\ \hline
+\( M \) & Maximum number of persons allowed in a household. \\ \hline
+\( \mathcal{A} \) & Set of attributes (e.g., age, income). \\ \hline
+\( A_{i,k} \) & Value (category) of attribute \( k \) for individual \( i \). \\ \hline
+\( \mathbb{1}[A_{i,k}=m] \) & Membership indicator: 1 if individual \( i \) belongs to cell \( m \) of tabulation \( k \), 0 otherwise. \\ \hline
+\( \mathcal{P} \) & Feasible set of attribute-value combinations consistent with the census rules (Appendix~\ref{sec:ref}). \\ \hline
+\( P_z \) & Target population (persons) of zone \( z \). \\ \hline
+\( H_z \) & Target number of households in zone \( z \). \\ \hline
+\( O_{z,k,m} \) & Synthesized (observed) count in cell \( m \) of tabulation \( k \) for zone \( z \). \\ \hline
+\( E_{z,k,m} \) & Target (census) count in cell \( m \) of tabulation \( k \) for zone \( z \). \\ \hline
+\( \text{tol}_{k,m} \) & Fitting tolerance for cell \( m \) of tabulation \( k \): maximum relative deviation \( |O_{z,k,m}-E_{z,k,m}|/E_{z,k,m} \) permitted before a zone is deemed unfitted for that cell. A value of \( 0.05 \) permits at most 5\% deviation. Used only as a convergence/reporting threshold; it does \emph{not} enter the Metropolis acceptance rule (Section~\ref{sec:sa}). \\ \hline
+\( \text{RSSZ} \) & Relative Sum of Squared Z-scores. \\ \hline
+\( \text{RSSZ}_z \) & RSSZ value for zone \( z \). \\ \hline
+\( \text{SSZ}_{z,k} \) & Sum of Squared Z-scores for tabulation \( k \) in zone \( z \) (the Pearson \(\chi^2\) term). \\ \hline
+\( N_k \) & Number of persons contributing to tabulation \( k \). \\ \hline
+\( C_k \) & Critical value of the \(\chi^2\) distribution for tabulation \( k \), adjusted for degrees of freedom. \\ \hline
+\( \min \frac{1}{|\mathcal{Z}|}\sum_{z} \text{RSSZ}_z \) & Objective function: minimize the mean RSSZ across zones. \\ \hline
+
+\end{longtable}
+% \tag{FORM-NOTATION-END}
+
+\FloatBarrier
+\subsection{Formulation}
+This study addresses the challenge of synthesizing populations so that the synthetic population's marginal distributions align with predefined constraining tabulations. The fit is evaluated using the \gls{rssz} statistic, proposed by \cite{Voas2001EvaluatingMicrodata} and refined by \cite{Huang2001AMicrodata.}, which normalises the squared deviation by the expected count so that small and large categories are treated on a comparable scale \citep{Rahman2023PopulationTechnique}.
+
+For a zone \( z \), the Sum of Squared Z-scores for tabulation \( k \) is the Pearson \(\chi^2\) term over its cells,
+
+\[
+\text{SSZ}_{z,k} = \sum_{m} \frac{\left( O_{z,k,m} - E_{z,k,m} \right)^2}{E_{z,k,m}},
+\]
+
+which is normalised by the table size and its \(\chi^2\) critical value to obtain the zone-level statistic
+
+\[
+\text{RSSZ}_z = \sum_{k \in \mathcal{K}} \text{RSSZ}_{z,k}, \qquad
+\text{RSSZ}_{z,k} = \frac{\text{SSZ}_{z,k}}{N_k \cdot C_k},
+\]
+
+where \( N_k \) is the number of persons contributing to table \( k \) and \( C_k \) the \(\chi^2\) critical value for \( k \) (with \( m-1 \) degrees of freedom for a table with \( m \) cells). Dividing by \( C_k \) lets tables with different numbers of cells be compared on an equal footing.
+
+The synthetic population is constructed independently for each zone. For each zone, a subset of households---and therefore individuals---is selected from the candidate pool and iteratively refined to minimise \( \text{RSSZ}_z \). Because the pool carries SA4-level geography and each SA2 zone is a subset of an SA4 region, zones can be fitted independently and in any order without affecting the result.
+
+\subsection*{Objective Function}
+The objective minimises the mean zone-level RSSZ across the region:
+
+\[
+\min \; \frac{1}{|\mathcal{Z}|} \sum_{z \in \mathcal{Z}} \text{RSSZ}_z .
+\]
+
+\subsection*{Constraints}
+The assignment of individuals to households within each zone is subject to the following constraints. Constraints C1--C4 and C6 are enforced (softly, via the objective, for the count targets) by the \gls{sa} fitting stage; C5 and the deterministic census rules of Appendix~\ref{sec:ref} are enforced upstream, by pool construction and household matching, not by the annealer.
+
+\begin{enumerate}[label=\textbf{C\arabic*}, ref=C\arabic*]
+
+    \item \textbf{Zone Population Constraint:}
+    \begin{align}
+        \sum_{h \in \mathcal{H}_z} \sum_{i \in \mathcal{I}} x_{i,h} = P_z, \quad \forall z \in \mathcal{Z}
+        \label{eq:zone_population}
+    \end{align}
+    The total number of persons assigned to zone \( z \) equals the zone's target population \( P_z \) (from the person-level control totals). In practice this target is met within a small tolerance via the RSSZ objective rather than as a hard equality.
+
+    \item \textbf{Household Size Constraint:}
+    \begin{align}
+        \sum_{i \in \mathcal{I}} x_{i,h} = H_{h,z}, \quad \forall h \in \mathcal{H}_z, \, z \in \mathcal{Z}
+        \label{eq:household_size}
+    \end{align}
+    The number of individuals assigned to household \( h \) matches the household's size \( H_{h,z} \), as determined by the household-reconstruction stage.
+
+    \item \textbf{Marginal Attribute Matching:}
+    \begin{align}
+        O_{z,k,m} &= \sum_{h \in \mathcal{H}_z} \sum_{i \in \mathcal{I}} x_{i,h} \cdot \mathbb{1}[A_{i,k} = m], \quad \forall z \in \mathcal{Z}, \, k \in \mathcal{K}, \, m \label{eq:marginal_count} \\
+        \left| O_{z,k,m} - E_{z,k,m} \right| &\leq \text{tol}_{k,m} \cdot E_{z,k,m}, \quad \forall z \in \mathcal{Z}, \, k \in \mathcal{K}, \, m \label{eq:marginal_tolerance}
+    \end{align}
+    Equation~\eqref{eq:marginal_count} counts, via the membership indicator \( \mathbb{1}[A_{i,k}=m] \), the synthesized number \( O_{z,k,m} \) of assigned individuals falling in each marginal cell; Equation~\eqref{eq:marginal_tolerance} bounds its relative deviation from the census target \( E_{z,k,m} \) by the tolerance \( \text{tol}_{k,m} \). The RSSZ objective penalises this deviation proportionally, so the tolerance acts as a convergence/reporting criterion rather than a hard feasibility gate.
+
+    \item \textbf{Assignment and Household Capacity:}
+    \begin{align}
+        \sum_{h \in \mathcal{H}_z} x_{i,h} &\leq 1, \quad \forall i \in \mathcal{I}, \, z \in \mathcal{Z} \label{eq:at_most_one} \\
+        \sum_{i \in \mathcal{I}} x_{i,h} &\leq M, \quad \forall h \in \mathcal{H}_z, \, z \in \mathcal{Z} \label{eq:capacity}
+    \end{align}
+    Each individual is assigned to at most one household (Equation~\eqref{eq:at_most_one}), and each household contains at most \( M \) persons (Equation~\eqref{eq:capacity}).
+
+    \item \textbf{Feasible Attribute Combinations (construction-level):}
+    \begin{align}
+        (A_{i,k}, A_{i,k'}) \in \mathcal{P}, \quad \forall i \in \mathcal{I}, \; (k, k') \in \mathcal{J}
+        \label{eq:jatt}
+    \end{align}
+    Every pair of attributes carried by a candidate record must be a feasible combination \( \mathcal{P} \) under the census rules (Appendix~\ref{sec:ref}). The condition is enforced by the construction predicates that build the feasible pool, by the forbidden-pair cuts of the expansion program, and by household matching, rather than as an explicit SA constraint. Construction therefore proposes unobserved but feasible combinations \emph{within} this space, and no stage exists whose purpose is to repair a record that leaves it.
+
+    \item \textbf{Integrality and Non-Negativity:}
+    \begin{align}
+        x_{i,h} \in \{0,1\}, \quad \forall i \in \mathcal{I}, \, h \in \mathcal{H}_z
+        \label{eq:integrality}
+    \end{align}
+    Assignment variables are binary. Tolerance parameters satisfy \( \text{tol}_{k,m} > 0 \).
+
+\end{enumerate}
+
+The census rules applied in the case study are described in Section~\ref{sec:casestudy} and formalised in Appendix~\ref{sec:ref}.

@@ -1,0 +1,11 @@
+\begin{enumerate}
+    \begin{itemize}
+        \item \textbf{\gls{ipu}:} 
+        \gls{ipu} is a widely used technique for generating representative synthetic populations that align with marginal distributions from survey data. Its strength lies in its ability to iteratively adjust the weights to match aggregate-level constraints, ensuring that the synthetic population reflects the desired distributions. This method is particularly effective for problems where high-fidelity matching to statistical targets is required. In the proposed framework, \gls{ipu} operates on the enhanced dataset from the \gls{gan}, using its representativeness to produce a population that satisfies demographic and household constraints.
+        
+    
+        \item \textbf{\gls{sa}:} \gls{sa} is a stochastic optimization technique particularly well-suited for problems involving complex, nonlinear constraints. Unlike \gls{ipu}, which works primarily with marginal distributions, \gls{sa} can handle the imputation of entire households holistically. This allows for the enforcement of household-level constraints more effectively, ensuring that the synthetic population reflects realistic household compositions. \Glspl{sa} ability to explore a wide solution space and converge to a global optimum makes it an excellent complement to\gls{ipu}, particularly for scenarios where household relationships are critical.
+        
+        
+    \end{itemize}
+\end{enumerate}

@@ -1,0 +1,217 @@
+\paragraph{MIP pool expansion}
+\label{sec:mip_pool_expansion}
+The constructed pool is feasible and cell-complete, but completeness is a
+property of the pool, not of a zone: in a given zone a control-table cell
+$(k,m)$ can require more records than that zone's slice of the pool can supply,
+and in the limiting case no household in the slice carries the cell at all.
+This is the zero-cell problem, and no weight vector or selection can repair it,
+because the records needed do not exist. Expansion therefore treats the
+zero-capacity case as the constraint it is, once the audit has established which
+cells are in it.
+
+\emph{What the audit measures.} For zone $z$ and control cell $(k,m)$, let
+$E_{z,k,m}$ be the census target and $s_{z,k,m}$ the number of candidate records
+in the zone's pool slice that carry the cell. The audit compares the target with
+the \emph{attainable capacity} $r_{\max}s_{z,k,m}$, where $r_{\max}$ is the
+largest number of times the zone fitter may replicate a single candidate, and
+places every cell with $E_{z,k,m}>0$ in one of three states: \emph{sufficient}
+if $r_{\max}s_{z,k,m}\ge E_{z,k,m}$; a \emph{partial shortfall} if
+$0<r_{\max}s_{z,k,m}<E_{z,k,m}$, which replication can reach and which is
+therefore left to the fitter; and \emph{zero capacity} if $s_{z,k,m}=0$, which
+no weight, selection or replication can reach because the candidates are absent.
+Only the third state is a pool deficiency, and only the third state is what
+expansion addresses. The distinction matters for how a poor zone fit is read: a
+cell in the second state is a fitting outcome, a cell in the third is a support
+defect that no fitter could have avoided, and the two are reported separately
+rather than pooled into one error term. \Cref{fig:mip_expansion} follows one zone
+through the step, and Table~\ref{tab:cp_vs_mip} states how construction and
+expansion differ.
+
+\begin{figure}[t]
+  \centering
+  \input{files/fig_mip_expansion.tex}
+  \caption{How a zone's zero-capacity cells are filled. For each zone the audit compares
+  every positive-target cell with the supply in that zone's pool slice; on the board, a
+  filled square is a cell the slice covers, an amber square one it covers only partly, and
+  a red square one it cannot supply at all. A square with no supply cannot be reached by
+  any weight vector, selection or replication. Each such cell
+  receives a candidate: a real donor who carries the cell, written into a real shell
+  dwelling from the same region that already has a member in the donor's role, so the
+  dwelling and family terms stay observed rather than invented. One program per zone then
+  selects a small set of candidates covering all zero cells at once, and the selected
+  households are appended to the pool with fresh identifiers. Coverage is soft: a cell with
+  no donor anywhere is reported by the audit rather than synthesised, and the zone fitter
+  (IPU, SA or MIP), not this step, decides how often an appended household is replicated.}
+  \label{fig:mip_expansion}
+\end{figure}
+
+
+\begin{table}[h!]
+\centering
+\caption{The two pool-side programs answer different questions and are not
+substitutes. Construction makes the pool complete over the modelled attributes for
+every zone at once; expansion repairs the cells a single zone's slice cannot supply.
+Neither stage allocates records to zones, which is why both are followed by a fitter.}
+\label{tab:cp_vs_mip}
+\footnotesize
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{1.7cm}
+                 >{\raggedright\arraybackslash}p{5.6cm}
+                 >{\raggedright\arraybackslash}p{6.3cm}@{}}
+\toprule
+ & \textbf{CP pool construction} & \textbf{MIP pool expansion} \\
+\midrule
+Question & Can every rule-feasible cell be represented in the pool at all? &
+Which cells can this zone's slice not supply, and which households can fill them? \\
+Scope & The whole census, all zones at once, all 19 control tables &
+One zone, and only the cells the audit places in the zero-capacity state \\
+Decision & Which category each modelled attribute takes, given a household shell and the
+observed conditional distributions & Which candidates enter a small added set, one binary
+per candidate, against all marginal tables at once \\
+Guarantee & Every emitted record satisfies $\mathcal{R}$, and the pool is cell-complete
+over the modelled attributes & Every added household satisfies $\mathcal{R}$, and every
+sourceable zero cell receives at least one candidate \\
+Does not & Use zone targets, match any zone total, or decide replication & Close the
+zone's full deficit, fit its totals, or decide how often a candidate is used \\
+Cost & 27.1 minutes and 5.0\,GB for the whole pool, once & About 100 seconds per zone,
+and only where zero cells exist \\
+Result here & 1{,}404{,}801 persons, no rule violations & 14 households (18 persons)
+across the ten audit zones \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\emph{Candidate construction.} For a zone $z$ let $\mathcal{Z}_z^0$ be the set of
+control cells with a positive census target and zero attainable capacity in the
+zone's candidate pool. For each such cell the module draws donor records from the
+census microdata that carry the cell, pairs each donor member profile with a real
+shell household from the same \texttt{REGUCP} that has a member in the donor's
+\texttt{RLHP} role, and writes the donor profile into that slot. If the donor
+profile conflicts with the shell's dwelling terms or with the rule set
+$\mathcal{R}$, a small completion program finds the closest feasible profile,
+\begin{equation}
+\min_{y}\;\sum_{a}\bigl(1-y_{a,\tau(a)}\bigr)
+\quad\text{s.t.}\quad
+\sum_{c} y_{a,c}=1,\;\;
+y_{a_1,c_1}+y_{a_2,c_2}\le 1 \;\;\forall\,(a_1,c_1,a_2,c_2)\in\mathcal{C},
+\label{eq:mip_repair}
+\end{equation}
+where $\tau(a)$ is the donor's code for attribute $a$ and $\mathcal{C}$ is the
+set of forbidden category pairs obtained by evaluating the shared rule set over
+every attribute domain mesh (2{,}027 cuts in the ten-zone development audit).
+Equation~\eqref{eq:mip_repair} is a \emph{candidate repair}, not the pool
+objective: it preserves a real donor profile wherever the hard rules allow, and
+it is solved separately for each candidate before any selection. The
+household-level fields are fixed to the shell, so every candidate remains atomic
+and family-coherent; candidates that fail the shared
+rule checks are discarded, never patched. For attributes outside
+the person-level model (e.g.\ \texttt{tend}, \texttt{typp}, \texttt{indp},
+\texttt{stup}, \texttt{assnp}), a person-level repair is not available, so the
+module falls back to a whole real donor household copied verbatim; the observed
+household is feasible by construction.
+
+\emph{Joint-marginal selection.} The candidates are then selected together, not
+cell by cell. Let $\mathcal{J}_z$ index the candidate households,
+$x_j\in\{0,1\}$ indicate selection, and $s_j$ be the number of persons in
+candidate $j$. For a control cell $(k,m)$, let $a_{j,k,m}$ be the candidate's
+contribution---the number of its members in the cell for a person-level table, or
+one if the household sits in the cell for a household-level table---and let
+$u_{j,k}=s_j$ for a person-level table and $u_{j,k}=1$ for a household-level
+table. With the zone target $E_{z,k,m}$ and target share
+\begin{equation}
+q_{k,m}=\frac{E_{z,k,m}}{\sum_{m'\in\mathcal{M}_k}E_{z,k,m'}},
+\label{eq:mip_share}
+\end{equation}
+the selection program is
+\begin{equation}
+\begin{aligned}
+\min_{x,e,d}\quad &
+\lambda_0\sum_{c\in\mathcal{Z}_z^0} e_c
+\;+\;\sum_{k\in\mathcal{K}}\sum_{m\in\mathcal{M}_k} w_{k,m}\,d_{k,m}
+\;+\;\lambda_1\sum_{j\in\mathcal{J}_z} x_j \\
+\text{s.t.}\quad &
+\sum_{j\in\mathcal{J}_z} a_{j,c}\,x_j+e_c\ge 1,
+&& c\in\mathcal{Z}_z^0,\\
+& d_{k,m}\ge \sum_{j\in\mathcal{J}_z}
+  \bigl(a_{j,k,m}-q_{k,m}u_{j,k}\bigr)x_j,
+&& k\in\mathcal{K},\,m\in\mathcal{M}_k,\\
+& d_{k,m}\ge -\sum_{j\in\mathcal{J}_z}
+  \bigl(a_{j,k,m}-q_{k,m}u_{j,k}\bigr)x_j,
+&& k\in\mathcal{K},\,m\in\mathcal{M}_k,\\
+& \sum_{j\in\mathcal{J}_z}x_j\le K_z,\qquad
+  \sum_{j\in\mathcal{J}_z}s_jx_j\le P_z^{\mathrm{add}},\\
+& \sum_{j\in\mathcal{J}_z(h)}x_j\le 1,
+&& h\in\mathcal{H}_z,\\
+& x_j\in\{0,1\},\quad e_c\ge 0,\quad d_{k,m}\ge 0.
+\end{aligned}
+\label{eq:mip_joint}
+\end{equation}
+Here $w_{k,m}=1/(|\mathcal{M}_k|\max(E_{z,k,m},1))$ gives every control table
+equal weight and prevents large person tables from dominating; the
+implementation divides $w$ by its maximum, a positive rescaling that does not
+change the argmin. The released defaults are $\lambda_0=10^5$ and
+$\lambda_1=10^{-2}$. With the default 256-person budget the whole marginal term
+is below about $2.6\times10^4$, so covering one zero cell is worth more than
+any marginal improvement the added set can buy. Coverage is still soft: an
+unsourceable cell cannot make the program infeasible, and a cell can be left
+uncovered when the budget or the candidate menu makes coverage impossible.
+$K_z$ and $P_z^{\mathrm{add}}$ are small budgets (defaults: 64 households and
+256 persons per zone), not the zone's population. The constraint over
+$\mathcal{J}_z(h)\subseteq\mathcal{J}_z$ permits at most one transplant per
+shell household.
+
+The important difference from a per-cell objective is that
+\eqref{eq:mip_joint} uses \emph{one} selection vector $x$ for \emph{all} control
+tables. The deviations $d_{k,m}$ are therefore not independent cell repairs:
+they measure how far the selected agents' aggregate profile is from the zone's
+total marginal composition, table by table, and the solver must trade those
+deviations against one another and against coverage. A set of records that fills
+every zero cell but distorts the income or tenure shares is penalised; a set that
+matches the shares but leaves a zero cell uncovered is penalised more heavily
+through $\lambda_0$. This is a joint fit over the marginal tables, not a fit to
+the full joint distribution: one selection vector must satisfy every table
+simultaneously, while the joint distribution over attribute combinations is the
+object of the zone fitter, not of the small pool-expansion program. The
+coverage constraints are soft ($e_c$) precisely so that an unsourceable
+cell---a structural zero, a padding code, or a cell with no donor anywhere---does
+not make the program infeasible; it is reported instead.
+
+The model is deliberately \emph{not} required to close the measured shortfall.
+The deficit in a zone is often tens of thousands of persons, while the candidate
+pool is a 5\% microsample and the added set is a few dozen households. Requiring
+$\sum_j a_{j,k,m}x_j\ge E_{z,k,m}$ for every cell would either be infeasible or
+force the pool to replicate the census many times over, which is the fitter's
+job, not the pool's. What the expansion asks for is weaker and sufficient:
+\emph{every zero cell for which a candidate exists should receive at least one
+feasible candidate}, and the added candidates should jointly resemble the zone's
+marginal totals. Because coverage is soft, a cell can still be left uncovered
+when the budget or the candidate menu makes coverage impossible; such cells are
+reported rather than silently dropped. The zone fit that follows decides which
+candidates are actually used.
+
+The module reports, per zone, the number of zero-capacity cells, how many are
+covered, the selected household and person counts, the weighted joint-marginal
+deviation, and the uncovered cells; the candidate-skip reasons are aggregated
+over the run.
+
+\emph{Development audit.} A ten-zone audit at the released defaults found 123
+zero-capacity cells among 146 deficient cells (the other 23 were partial
+shortfalls left to the zone fitter). The module generated donor--shell
+candidates for 70 of the 73 sourceable zero cells and the joint selection
+covered all 70, using 14 households (18 person rows) in total---one or two
+households and at most three persons per zone, far inside the 64-household and
+256-person budgets. All ten selection programs solved to optimality, and every
+selected row passed the 11 shared rule checks. The 53 cells
+left uncovered were 40 cells in four control codes absent from the census
+extract, 10 \texttt{tend:6} padding cells, and three \texttt{tenlld:11} cases where no
+donor--shell candidate survived the household and rule checks. The weighted
+joint-marginal deviation of the added set was 0.239--1.622 per zone (median
+0.406), and its unweighted mean absolute cell deviation was 0.126--0.280. These
+are deviations of the added set, not of the fitted zone population; the audit
+establishes that the mechanism can fill the sourceable zero cells with a small
+number of feasible records, not that it closes the zone's full deficit.
+Appendix~\ref{sec:pool_expansion_audit} gives the per-zone table and the
+interpretation of the residual cells.
+%% Audit source: outputs/full10_joint_report.json and
+%% outputs/full10_joint_audit.log (10 zones, joint mode, released defaults;
+%% 1,013.5 s).

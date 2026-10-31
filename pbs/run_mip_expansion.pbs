@@ -1,0 +1,155 @@
+#!/bin/bash -l
+#PBS -N synth_mip_expand
+#PBS -l walltime=24:00:00
+#PBS -l select=1:ncpus=4:mem=64GB
+#PBS -j n
+#PBS -m abe
+#PBS -r y
+
+# =============================================================================
+# run_mip_expansion.pbs — the pool-construction chain, without a generator
+# =============================================================================
+# ONE-LINE COMMAND:
+#   qsub pbs/run_mip_expansion.pbs
+#
+# Replaces the retired GAN chain (pbs/_gan_retired/). Builds the candidate pool
+# from the census by constraint-guided resampling, audits which control cells the
+# pool cannot supply, then *solves* for the missing donors with the deficit MILP
+# and appends whole transplanted households.
+#
+#   1. CP feasible pool      build_feasible_pool_cp.py  -> feasible_pool.csv
+#      - rules + pairwise support over the fused census
+#      - zero-cell infill (whole donor households)
+#      - control-table coverage infill for demanded categories
+#      - QALFP recoded to ABS control coding (codes >= 12 shift up by one)
+#   2. Coverage audit        audit_cp_pool_coverage.py  -> cp_pool_coverage.json
+#      - zone -> REGUCP mapping complete, and every demanded category sourceable
+#   3. MIP pool expansion    mip_pool.py --mode joint   -> feasible_pool_expanded.csv
+#      - capacity(zone, cell) = rep_max * sum of candidate contributions
+#      - deficit = cells whose capacity falls below the zone target
+#      - one MILP per zone: one-hot attribute rows, forbidden-pair cuts encoding
+#        the hard rule set, objective = minimum Hamming deviation from the donor
+#        profile imported from elsewhere in the census
+#      - household fields fixed to a real local shell, so emitted households are
+#        atomic; failures are retried on another shell, never patched
+#   4. Optional fits         SUBMIT_FITS=1 submits MIP fits on the expanded pool
+#
+# The chain is serial inside one job because each step's output is the next
+# step's input. Walltime is dominated by step 1 (27 min on a 16 GB workstation,
+# ~1 h on 4 compute cores); step 3 is bounded by --joint-time-limit per zone.
+#
+# Env vars:
+#   SYNTH_POP, CENSUS_DIR, CPU_ENV_NAME, CPU_ENV_PREFIX
+#   CP_TARGET_PER_CELL (5), CP_MAX_INFILL_CELLS (30000)
+#   EXPAND_REP_MAX (40), EXPAND_MAX_CELLS (4000), EXPAND_TIME_LIMIT (30)
+#   ZONES_FILE / ZONES_LIMIT  restrict step 3 to a subset (smoke testing)
+#   SUBMIT_FITS=1             also submit MIP fits for the expanded pool
+# =============================================================================
+
+set -euo pipefail
+
+_fail() {
+  local line="$1" cmd="$2" rc="$3"
+  { echo ""; echo "  MIP-EXPANSION CHAIN FAILED  (line $line, cmd $cmd, rc $rc)"; } | tee /dev/stderr
+  exit "$rc"
+}
+trap '_fail $LINENO "$BASH_COMMAND" $?' ERR
+
+run_py() {
+  local script="$1"; shift
+  echo ""
+  echo ">>> [$(date '+%H:%M:%S')]  ${PYTHON_BIN} -u $script $*"
+  "${PYTHON_BIN}" -u "$script" "$@"
+  echo "<<< [$(date '+%H:%M:%S')]  $script finished (exit 0)"
+}
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+CENSUS_DIR="${CENSUS_DIR:-/home/ahernz/Population_Synth}"
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+export USE_HPC=1
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+
+# ---- paper hold-out basis (19 in-sample tables) ------------------------------
+PAPER19="${PAPER19:-$SYNTH_POP/data_sa2_controls_paper19}"
+if [ ! -d "$PAPER19" ] || [ "$(ls -1 "$PAPER19"/*.csv 2>/dev/null | wc -l)" -lt 19 ]; then
+  mkdir -p "$PAPER19"
+  for t in indp sexp typp mtwp occp mstp incp stup rlhp hrsp heap qallp qalfp \
+           rntrd mrerd vehrd nprd hind strd; do
+    cp -f "$SYNTH_POP/data_sa2_controls/sa2${t}.csv" "$PAPER19/" 2>/dev/null || true
+  done
+fi
+export SA_CONTROL_DIR="$PAPER19"
+
+CENSUS_CSV="${CENSUS_CSV:-$CENSUS_DIR/LINKED_DATA_national.csv}"
+POOL="$SYNTH_POP/outputs/feasible_pool.csv"
+EXPANDED="$SYNTH_POP/outputs/feasible_pool_expanded.csv"
+
+echo "================================================================"
+echo "  MIP pool expansion   Host: $(hostname)   Job: ${PBS_JOBID:-local}"
+echo "  Start: $(date)"
+echo "  census : $CENSUS_CSV"
+echo "  control: $SA_CONTROL_DIR ($(ls -1 "$SA_CONTROL_DIR"/*.csv 2>/dev/null | wc -l) tables)"
+echo "================================================================"
+
+[[ -f "$CENSUS_CSV" ]] || { echo "ERROR: $CENSUS_CSV not found"; exit 1; }
+
+# ---- 1. CP feasible pool -----------------------------------------------------
+# 21 modelled attributes. Household-atomic infill appends WHOLE donor households,
+# so rows = draws x mean household size (~2.5); 5 per cell fills every sampling
+# zero without the ~2.7M-row pool that OOM-killed a 96 GB job at 20 per cell.
+CONTROL_ATTRS="SEXP AGEP MSTP HEAP OCCP INCP LFSP EMPP HRSP QALFP QALLP RLHP MTWP NPRD VEHRD MRERD RNTRD STRD HIND BEDRD HHCD"
+CP_TARGET_PER_CELL="${CP_TARGET_PER_CELL:-5}"
+CP_MAX_INFILL_CELLS="${CP_MAX_INFILL_CELLS:-30000}"
+
+( cd "$SYNTH_POP" && run_py build_feasible_pool_cp.py \
+    --census "$CENSUS_CSV" --control-attrs $CONTROL_ATTRS \
+    --min-count 5 --target-per-cell "$CP_TARGET_PER_CELL" \
+    --max-infill-cells "$CP_MAX_INFILL_CELLS" \
+    --coverage-tables --coverage-per-category 5 \
+    --out "$POOL" \
+    --report-json "$SYNTH_POP/outputs/feasible_pool_build_report.json" )
+
+# Alias the fits read; kept in step so MIP and SA see the same pool.
+mkdir -p "$SYNTH_POP/outputs/cp_pool_results"
+cp -f "$POOL" "$SYNTH_POP/outputs/cp_pool_results/cp_feasible_pool.csv"
+
+# ---- 2. Coverage audit -------------------------------------------------------
+# Answers the question step 3 exists for: which (zone, attribute, code) cells does
+# the pool have no donor for at all? Any category listed here is the deficit the
+# MILP will synthesise.
+( cd "$SYNTH_POP" && run_py audit_cp_pool_coverage.py \
+    --pool "$POOL" --json "$SYNTH_POP/outputs/cp_pool_coverage.json" )
+
+# ---- 3. MIP pool expansion ---------------------------------------------------
+EXPAND_ARGS=(--pool "$POOL" --census "$CENSUS_CSV" --mode joint
+             --rep-max "${EXPAND_REP_MAX:-40}"
+             --max-transplant-cells "${EXPAND_MAX_CELLS:-4000}"
+             --joint-time-limit "${EXPAND_TIME_LIMIT:-30}"
+             --out "$EXPANDED"
+             --report "$SYNTH_POP/outputs/cp_expand_report.json")
+[[ -n "${ZONES_FILE:-}" ]]  && EXPAND_ARGS+=(--zones-file "$ZONES_FILE")
+[[ -n "${ZONES_LIMIT:-}" ]] && EXPAND_ARGS+=(--zones-limit "$ZONES_LIMIT")
+
+( cd "$SYNTH_POP" && run_py mip_pool.py "${EXPAND_ARGS[@]}" )
+
+[[ -s "$EXPANDED" ]] || { echo "ERROR: expansion produced no pool at $EXPANDED"; exit 1; }
+
+# ---- 4. Optional: fits on the expanded pool ----------------------------------
+# Off by default: the fits are long and should be chunked (stage_cp_mip_chunk.pbs,
+# stage_cp_sa_chunk.pbs). POOL_OVERRIDE points them at the expanded pool.
+if [[ "${SUBMIT_FITS:-0}" == "1" ]]; then
+  echo ""
+  echo "  SUBMIT_FITS=1 -> submitting fits on the expanded pool"
+  POOL_OVERRIDE="$EXPANDED" qsub "$SYNTH_POP/pbs/stage_cp_mip.pbs"
+  POOL_OVERRIDE="$EXPANDED" qsub "$SYNTH_POP/pbs/stage_cp_sa_only.pbs"
+fi
+
+echo ""
+echo "  pool    : $POOL      ($(( $(wc -l < "$POOL") - 1 )) rows)"
+echo "  expanded: $EXPANDED  ($(( $(wc -l < "$EXPANDED") - 1 )) rows)"
+echo "  report  : $SYNTH_POP/outputs/cp_expand_report.json"
+echo "  MIP EXPANSION CHAIN COMPLETE : $(date)"

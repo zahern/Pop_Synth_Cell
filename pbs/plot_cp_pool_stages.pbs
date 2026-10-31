@@ -1,0 +1,33 @@
+#!/bin/bash -l
+#PBS -N synth_cp_pool_plot
+#PBS -l walltime=02:00:00
+#PBS -l select=1:ncpus=2:mem=16GB
+#PBS -j oe
+#PBS -r y
+
+set -euo pipefail
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+MICRODATA="${MICRODATA:-$SYNTH_POP/microdata_for_exp.csv}"
+CP_POOL="${CP_POOL:-$SYNTH_POP/outputs/feasible_pool.csv}"
+EXPANDED_POOL="${EXPANDED_POOL:-$SYNTH_POP/outputs/feasible_pool_expanded_v2.csv}"
+REPORT_DIR="${REPORT_DIR:-$SYNTH_POP/outputs/cp_pool_stage_report}"
+PAPER_FIGURE_DIR="${PAPER_FIGURE_DIR:-/home/ahernz/Paper_Plan/Population_Synthesiser___GAN_SA}"
+
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+[[ -x "$PYTHON_BIN" ]] || { echo "Missing Python: $PYTHON_BIN"; exit 1; }
+[[ -f "$MICRODATA" ]] || { echo "Missing microdata: $MICRODATA"; exit 1; }
+[[ -f "$CP_POOL" ]] || { echo "Missing CP pool: $CP_POOL"; exit 1; }
+[[ -f "$EXPANDED_POOL" ]] || { echo "Missing expanded pool: $EXPANDED_POOL"; exit 1; }
+
+cd "$SYNTH_POP"
+"$PYTHON_BIN" -u pool_component_report.py \
+  --microdata "$MICRODATA" \
+  --cp-pool "$CP_POOL" \
+  --mip-pool "$EXPANDED_POOL" \
+  --output-dir "$REPORT_DIR" \
+  --paper-figure-dir "$PAPER_FIGURE_DIR"
+echo "CP stage plot written to $REPORT_DIR"

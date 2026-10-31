@@ -1,0 +1,128 @@
+#!/bin/bash -l
+#PBS -N synth_cp_mip
+#PBS -l walltime=48:00:00
+#PBS -l select=1:ncpus=4:mem=64GB
+#PBS -j n
+#PBS -m abe
+#PBS -r y
+
+# =============================================================================
+# Stage CP-MIP — fit zones with a MIP (tolerance relaxation) + CP-pool SA
+# =============================================================================
+# Runs AFTER stage_cp_pool.pbs (afterok).  Two candidate-pool fitting methods
+# over the same CP feasible pool:
+#   1. mip_fit.py        — mixed-integer program, relaxes tolerance if infeasible
+#   2. cp_pool_sa.py     — simulated annealing over the same pool (baseline)
+#
+# Env vars: SYNTH_POP, CENSUS_DIR, TOL, RELAX_FACTOR, MAX_RELAX, SA_ITER, ZONES
+
+set -euo pipefail
+
+_fail() {
+  local line="$1" cmd="$2" rc="$3"
+  { echo ""; echo "  STAGE CP-MIP FAILED  (line $line, cmd $cmd, rc $rc)"; } | tee /dev/stderr
+  exit "$rc"
+}
+trap '_fail $LINENO "$BASH_COMMAND" $?' ERR
+
+run_py() {
+  local script="$1"; shift
+  echo ""
+  echo ">>> [$(date '+%H:%M:%S')]  ${PYTHON_BIN} -u $script $*"
+  "${PYTHON_BIN}" -u "$script" "$@"
+  local rc=$?
+  if [[ $rc -ne 0 ]]; then echo "<<< $script failed (exit $rc)"; return "$rc"; fi
+  echo "<<< [$(date '+%H:%M:%S')]  $script finished (exit 0)"
+}
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+
+# ---- paper hold-out basis (19 in-sample tables) --------------------------
+# The live data_sa2_controls directory also holds the 7 held-out tables; fitting
+# from it would optimise against them. Build and use the 19-table directory.
+PAPER19="${PAPER19:-$SYNTH_POP/data_sa2_controls_paper19}"
+if [ ! -d "$PAPER19" ] || [ "$(ls -1 "$PAPER19"/*.csv 2>/dev/null | wc -l)" -lt 19 ]; then
+  mkdir -p "$PAPER19"
+  for t in indp sexp typp mtwp occp mstp incp stup rlhp hrsp heap qallp qalfp \
+           rntrd mrerd vehrd nprd hind strd; do
+    cp -f "$SYNTH_POP/data_sa2_controls/sa2${t}.csv" "$PAPER19/" 2>/dev/null || true
+  done
+fi
+export SA_CONTROL_DIR="$PAPER19"
+echo "  control basis: $SA_CONTROL_DIR ($(ls -1 "$SA_CONTROL_DIR"/*.csv 2>/dev/null | wc -l) tables)"
+
+CENSUS_DIR="${CENSUS_DIR:-/home/ahernz/Population_Synth}"
+TOL="${TOL:-0.05}"
+RELAX_FACTOR="${RELAX_FACTOR:-2.0}"
+MAX_RELAX="${MAX_RELAX:-5}"
+SA_ITER="${SA_ITER:-1000}"
+
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+export USE_HPC=1
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+
+echo "================================================================"
+echo "  Stage CP-MIP — MIP fit (tolerance relaxation) + CP-pool SA"
+echo "  Host : $(hostname)   Job : ${PBS_JOBID:-local}   Start : $(date)"
+echo "  TOL  : $TOL  relax=$RELAX_FACTOR  max_relax=$MAX_RELAX"
+echo "================================================================"
+
+# Pool discovery: stage_cp_pool writes $SYNTH_POP/outputs/feasible_pool.csv,
+# but /home vs /mnt/hpccs01/home path aliases and manual runs can desync the
+# mirror (Oct-2026: pool built 02:08, MIP at 06:00 saw "not found" and died).
+# Check every known location, honour $POOL_OVERRIDE, and auto-rebuild from the
+# national census as a last resort instead of hard-failing.
+POOL_OVERRIDE="${POOL_OVERRIDE:-}"
+POOL_CANDIDATES=(
+  ${POOL_OVERRIDE:+$POOL_OVERRIDE}
+  "$SYNTH_POP/outputs/feasible_pool.csv"
+  "$SYNTH_POP/outputs/cp_pool_results/cp_feasible_pool.csv"
+  "/mnt/hpccs01/home/ahernz/Paper_Plan/synth_pop/outputs/feasible_pool.csv"
+  "/home/ahernz/Paper_Plan/synth_pop/outputs/feasible_pool.csv"
+)
+POOL=""
+for _c in "${POOL_CANDIDATES[@]}"; do
+  [[ -n "$_c" && -f "$_c" ]] && { POOL="$_c"; break; }
+done
+if [[ -z "$POOL" ]]; then
+  echo "WARNING: CP pool not found in any known location; auto-rebuilding from national census..."
+  for _c in "${POOL_CANDIDATES[@]}"; do echo "  checked: ${_c:-<empty>}"; done
+  CENSUS_CSV="$CENSUS_DIR/LINKED_DATA_national.csv"
+  [[ -f "$CENSUS_CSV" ]] || { echo "ERROR: national census not found either: $CENSUS_CSV"; exit 1; }
+  POOL="$SYNTH_POP/outputs/feasible_pool.csv"
+  mkdir -p "$(dirname "$POOL")"
+  CONTROL_ATTRS="SEXP AGEP MSTP HEAP OCCP INCP LFSP EMPP HRSP QALFP QALLP RLHP MTWP NPRD VEHRD MRERD RNTRD STRD HIND BEDRD HHCD"
+  ( cd "$SYNTH_POP" && run_py build_feasible_pool_cp.py \
+      --census "$CENSUS_CSV" --control-attrs $CONTROL_ATTRS \
+      --min-count 5 --target-per-cell 20 \
+      --out "$POOL" )
+  [[ -f "$POOL" ]] || { echo "ERROR: auto-rebuild failed, pool still missing: $POOL"; exit 1; }
+  echo "  [OK] Pool auto-rebuilt: $POOL"
+else
+  echo "  [OK] CP pool: $POOL"
+fi
+
+ZONE_ARG=()
+[[ -n "${ZONES:-}" ]] && ZONE_ARG=(--zones $ZONES)
+
+# ---- 1. MIP fitting (tolerance relaxation) ----
+( cd "$SYNTH_POP" && run_py mip_fit.py \
+    --pool "$POOL" \
+    --tol "$TOL" --relax-factor "$RELAX_FACTOR" --max-relax "$MAX_RELAX" \
+    "${ZONE_ARG[@]}" )
+
+# ---- 2. CP-pool + SA baseline ----
+( cd "$SYNTH_POP" && run_py cp_pool_sa.py \
+    --census "$CENSUS_DIR/LINKED_DATA_national.csv" \
+    --pool "$POOL" \
+    --max-iter "$SA_ITER" "${ZONE_ARG[@]}" \
+    --results-dir "$SYNTH_POP/outputs/cp_pool_results/mip_${PBS_JOBID:-local}" )
+
+echo ""
+echo "  Stage CP-MIP COMPLETE"
+echo "    $SYNTH_POP/outputs/cp_mip_results/cp_mip_summary.csv"
+echo "    $SYNTH_POP/outputs/cp_pool_results/cp_pool_rssz_summary.csv"

@@ -1,0 +1,68 @@
+#!/bin/bash -l
+#PBS -N synth_cp_mip_chunk
+#PBS -l walltime=48:00:00
+#PBS -l select=1:ncpus=4:mem=64GB
+#PBS -j n
+#PBS -m abe
+#PBS -r y
+
+# =============================================================================
+# Stage CP-MIP chunk — MIP fitting over a zone subset (no SA baseline).
+# Part of the 2026-10-09 parallel catch-up: the single serial job managed
+# ~11 zones in ~15 h (~80 min/zone), so the remaining zones are split into
+# parallel chunks. Each chunk writes its own cp_mip_summary_chunk<ID>.csv
+# because the shared cp_mip_summary.csv would be clobbered by concurrent jobs
+# (merge the per-chunk files once every chunk has finished).
+#
+# Env vars: SYNTH_POP, CHUNK_ID, ZONES (space-separated), TOL, RELAX_FACTOR,
+#           MAX_RELAX, CPU_ENV_NAME, CPU_ENV_PREFIX,
+#           MIP_TIME_LIMIT (per-zone HiGHS seconds, default 7200 — unbounded
+#             MIP solves walltime-killed 6 of 8 Oct-2026 chunks at 48h),
+#           MIP_MAX_CAND (candidate-household ceiling, default 150000 —
+#             uncapped full-pool fallbacks OOM-killed the other 2)
+#           Keep chunks to ~6 zones: MIP runs ~hours/zone on hard zones.
+# =============================================================================
+
+set -euo pipefail
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+CHUNK_ID="${CHUNK_ID:-0}"
+TOL="${TOL:-0.05}"
+RELAX_FACTOR="${RELAX_FACTOR:-2.0}"
+MAX_RELAX="${MAX_RELAX:-5}"
+
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+export USE_HPC=1
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+
+POOL="$SYNTH_POP/outputs/feasible_pool.csv"
+[[ -f "$POOL" ]] || { echo "ERROR: CP pool not found: $POOL"; exit 1; }
+[[ -n "${ZONES:-}" ]] || { echo "ERROR: ZONES is empty"; exit 1; }
+
+echo "================================================================"
+echo "  Stage CP-MIP chunk ${CHUNK_ID}"
+echo "  Host : $(hostname)   Job : ${PBS_JOBID:-local}   Start : $(date)"
+echo "  Zones: $ZONES"
+echo "================================================================"
+
+# shellcheck disable=SC2086
+"$PYTHON_BIN" -u "$SYNTH_POP/mip_fit.py" \
+    --pool "$POOL" \
+    --tol "${TOL:-0.05}" --relax-factor "${RELAX_FACTOR:-2.0}" --max-relax "${MAX_RELAX:-5}" \
+    --hh-tol-mult "${HH_TOL_MULT:-2.0}" \
+    --abs-floor "${ABS_FLOOR:-2.0}" \
+    --time-limit "${MIP_TIME_LIMIT:-7200}" \
+    --max-candidates "${MIP_MAX_CAND:-150000}" \
+    --zones $ZONES
+
+SUM="$SYNTH_POP/outputs/cp_mip_results/cp_mip_summary.csv"
+if [[ -f "$SUM" ]]; then
+    cp "$SUM" "$SYNTH_POP/outputs/cp_mip_results/cp_mip_summary_chunk${CHUNK_ID}.csv"
+    echo "  saved chunk summary: cp_mip_summary_chunk${CHUNK_ID}.csv"
+fi
+
+echo "  CHUNK ${CHUNK_ID} COMPLETE : $(date)"

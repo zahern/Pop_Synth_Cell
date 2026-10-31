@@ -1,0 +1,52 @@
+#!/bin/bash -l
+#PBS -N synth_unified_cmp
+#PBS -l walltime=03:00:00
+#PBS -l select=1:ncpus=4:mem=32GB
+#PBS -j n
+#PBS -m abe
+#PBS -r y
+
+# =============================================================================
+# Unified clone + joint comparison across ALL methods.
+#
+# COMPUTE-NODE ONLY. This PBS job requests a full node (select=1:ncpus=4:mem=32GB
+# place=free), so PBS schedules it on a compute node -- it is NEVER dispatched to
+# the login/head node.  Do NOT run unified_comparison.py directly on the login
+# node; submit it with:
+#
+#     qsub -P FPAXJW8067 pbs/stage_unified_comparison.pbs
+#
+# (Optional: add -v SYNTH_POP=/home/ahernz/Paper_Plan/synth_pop if the default
+#  below does not resolve.)
+# =============================================================================
+set -euo pipefail
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+export USE_HPC=1
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+
+# --- refuse to run on a login/head node (belt-and-braces) -------------------------
+HN="${HOSTNAME:-$(hostname 2>/dev/null || echo unknown)}"
+case "$HN" in
+  aquarius0*|*login*|*headnode*)
+    echo "ERROR: this script must run on a compute node, not the login/head node ($HN)." >&2
+    exit 64
+    ;;
+esac
+if [ -z "${PBS_JOBID:-}" ]; then
+  echo "ERROR: no PBS_JOBID -- this must be submitted via qsub, not run on the login node." >&2
+    exit 64
+fi
+echo "Running on compute node: $HN   PBS_JOBID=${PBS_JOBID}"
+
+cd "$SYNTH_POP"
+echo "Start: $(date -Is)"
+"$PYTHON_BIN" -u "$SYNTH_POP/unified_comparison.py" "$@"
+rc=$?
+echo "unified_comparison.py rc=$rc   End: $(date -Is)"
+exit $rc

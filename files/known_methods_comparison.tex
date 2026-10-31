@@ -1,0 +1,89 @@
+% Appendix comparison framework. Numerical cells must be populated only after
+% all methods are run on the same zones, controls, and evaluation protocol.
+
+\subsection{Comparison with Established Population-Synthesis Methods}
+\label{sec:known_methods_comparison}
+
+The comparison below distinguishes the mechanisms being compared. It is not
+an empirical ranking: performance values should only be added after each
+method has been evaluated on the same reconciled household universe, zone
+cohort, control tables, and output-size protocol.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Conceptual comparison of candidate population-synthesis methods.}
+\label{tab:known-methods-comparison}
+\begin{tabular}{@{}p{0.16\textwidth}p{0.19\textwidth}p{0.20\textwidth}p{0.19\textwidth}p{0.16\textwidth}@{}}
+\toprule
+\textbf{Method} & \textbf{Candidate generation} & \textbf{How controls are fitted} &
+\textbf{Joint-structure mechanism} & \textbf{Key limitation} \\
+\midrule
+IPU / iterative fitting &
+Existing microdata &
+Record weights are iteratively adjusted &
+Inherited from observed records; no new support &
+Cannot populate an absent joint cell \\
+\addlinespace
+Raking / IPF &
+Existing microdata or contingency seed &
+Alternating marginal projections &
+Depends on seed-table support and structural zeros &
+Sensitive to zero cells and incompatible margins \\
+\addlinespace
+BN + IPF &
+Conditional sampling from a Bayesian network &
+Raking or iterative marginal adjustment &
+Conditional dependencies represented by the network &
+Sensitive to network specification and parameter estimation \\
+\addlinespace
+CP / MIP &
+Feasible records or household archetypes &
+Integer or constraint-based selection &
+Explicit feasibility and joint constraints &
+Computational cost and possible infeasibility \\
+\addlinespace
+Generative augmentation + fitting &
+Learned candidates plus retained microdata &
+Method-specific weighting or heuristic selection &
+Learned associations, then explicit marginal fitting &
+Generated records can violate structural rules and need a repair pass \\
+\addlinespace
+PopGen / simPop-style &
+Parametric or conditional sampling &
+Method-specific weighting or calibration &
+Model-based conditional structure &
+Results depend on chosen model and calibration variables \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Matched empirical protocol.}
+The empirical appendix should report every method on the same SA2 cohort and
+with the same reconciled person and dwelling targets. At minimum, report
+person marginal error, household marginal error, joint TVD, association error,
+structural-violation rate, runtime, and the number of zones completed. For
+stochastic methods, report repeated-seed means and uncertainty intervals.
+Methods that cannot solve a zone should be counted and the infeasibility
+reason reported rather than silently omitted.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Empirical comparison template for the matched cohort.}
+\label{tab:matched-method-results}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+\textbf{Method} & \textbf{Zones} & \textbf{Person TVD} &
+\textbf{HH TVD} & \textbf{Joint TVD} & \textbf{$|\Delta V|$} &
+\textbf{Violation rate} \\
+\midrule
+IPU / iterative fitting & -- & -- & -- & -- & -- & -- \\
+Raking / IPF             & -- & -- & -- & -- & -- & -- \\
+BN + IPF                & -- & -- & -- & -- & -- & -- \\
+CP / MIP                & -- & -- & -- & -- & -- & -- \\
+SA-Only                 & -- & -- & -- & -- & -- & -- \\
+MIP-expanded pool + SA  & -- & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}

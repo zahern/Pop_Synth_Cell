@@ -1,0 +1,126 @@
+% =============================================================================
+% fig:mip_expansion -- filling a zone's zero-capacity cells.
+%
+% Same board language as fig:cp_pool, one zone wide: a zone's control board has
+% a positive target in a square its pool slice cannot supply at all, and no
+% weight vector, selection or replication can reach it. Expansion builds
+% donor x shell candidates for exactly those squares, one program per zone
+% selects a handful, and the board is complete.
+%
+% Square states: blue = the pool slice covers the target; amber = covered but
+% short; red = a positive target with no supply.
+%
+% Editing rules: no \\ inside a braced group; keep card text short, because the
+% board is only ~2 cm tall and the cards sit beside it.
+% =============================================================================
+\providecolor{ForestGreen}{rgb}{0.0,0.258,0.145}
+\begin{tikzpicture}[
+  font=\footnotesize,
+  >=latex,
+  sq/.style={draw=black!50, minimum width=0.44cm, minimum height=0.42cm,
+             inner sep=0pt, line width=0.4pt},
+  have/.style={sq, fill=blue!16, draw=blue!45!black},
+  short/.style={sq, fill=orange!30, draw=orange!70!black},
+  zero/.style={sq, fill=red!25, draw=red!70!black, line width=0.8pt},
+  filled/.style={sq, fill=ForestGreen!20, draw=ForestGreen!70!black, line width=0.8pt},
+  hdr/.style={font=\scriptsize, text=black!60, inner sep=1pt},
+  rowlab/.style={font=\scriptsize, anchor=east, text=black!85, inner sep=2pt},
+  tag/.style={font=\scriptsize, text=black!75, align=center, inner sep=2pt},
+  flow/.style={->, thick, draw=black!60},
+  card/.style={draw=black!45, rounded corners=2pt, align=left, inner sep=3pt,
+               fill=white},
+  val/.style={font=\tiny, text=black!85, inner sep=0pt},
+]
+
+% ============================================================ board, zone z
+\node[font=\scriptsize\bfseries, anchor=south] at (2.27,0.62)
+  {zone $z$: \textnormal{target / in pool}};
+
+\foreach \c [count=\j] in {1,...,6} {
+  \node[hdr] at ({0.95+(\j-0.5)*0.44},0.34) {\c};
+}
+
+% 1 = covered, 0 = covered but short, 2 = no supply at all.
+\foreach \r/\row/\name in {%
+  0/{1,1,1,1,1,1}/SEXP,%
+  1/{1,1,1,1,1,1}/HEAP,%
+  2/{1,1,1,2,1,1}/MSTP,%
+  3/{1,1,1,1,1,1}/OCCP,%
+  4/{1,0,1,1,1,1}/VEHRD}%
+{
+  \node[rowlab] at (0.82,{-\r*0.44}) {\name};
+  \foreach \d [count=\j] in \row {
+    \pgfmathsetmacro{\x}{0.95+(\j-0.5)*0.44}
+    \pgfmathsetmacro{\y}{-\r*0.44}
+    \ifnum\d=2
+      \node[zero, label={[val]center:8/0}] at (\x,\y) {};
+    \else\ifnum\d=0
+      \node[short, label={[val]center:9/3}] at (\x,\y) {};
+    \else
+      \node[have] at (\x,\y) {};
+    \fi\fi
+  }
+}
+
+% ======================================================== candidate for a cell
+\draw[flow] (3.62,-1.00) -- (4.05,-1.00);
+
+\node[card, anchor=north west] (cand) at (4.10,0.36) {\parbox{2.75cm}{%
+  \scriptsize\raggedright
+  \textbf{One candidate}\\[2pt]
+  \textbf{donor}: a person with the square\\[2pt]
+  \textbf{shell}: a real dwelling, a member in that role\\[2pt]
+  \textbf{candidate}: donor in shell $=$ one household}};
+
+% ================================================================ one program
+\draw[flow] (7.02,-1.00) -- (7.45,-1.00);
+
+\node[card, draw=blue!55!black, fill=blue!6, anchor=north west, name=prog]
+  at (7.55,0.36)
+  {\parbox{2.45cm}{\scriptsize\raggedright
+  \textbf{One program}\\[2pt]
+  covers every zero square at once\\[2pt]
+  budget 64 households, 256 persons\\[2pt]
+  no donor $\Rightarrow$ reported, not invented}};
+
+% ==================================================================== settled
+\draw[flow] (10.15,-1.00) -- (10.55,-1.00);
+
+\node[font=\scriptsize\bfseries, anchor=south] at (11.92,0.62)
+  {after expansion: \textnormal{2 households appended}};
+
+\foreach \c [count=\j] in {1,...,6} {
+  \node[hdr] at ({10.62+(\j-0.5)*0.44},0.34) {\c};
+}
+
+\foreach \r/\row/\name in {%
+  0/{1,1,1,1,1,1}/SEXP,%
+  1/{1,1,1,1,1,1}/HEAP,%
+  2/{1,1,1,3,1,1}/MSTP,%
+  3/{1,1,1,1,1,1}/OCCP,%
+  4/{1,3,1,1,1,1}/VEHRD}%
+{
+  \foreach \d [count=\j] in \row {
+    \pgfmathsetmacro{\x}{10.62+(\j-0.5)*0.44}
+    \pgfmathsetmacro{\y}{-\r*0.44}
+    \ifnum\d=3
+      \node[filled, label={[val]center:\textbf{2}}] at (\x,\y) {};
+    \else
+      \node[have] at (\x,\y) {};
+    \fi
+  }
+}
+
+% ================================================================ audit line
+% Anchored below the tallest card rather than at a fixed y, so the note cannot
+% collide with the card text when the wording changes.
+\node[anchor=north west, align=left, text width=13.2cm, font=\scriptsize,
+      inner sep=1pt] at ($(prog.south west)+(-7.50,-0.32)$)
+  {\textbf{What the audit found across ten zones.} 123 zero-capacity cells, 73 of
+   them sourceable from donors, 70 covered with 14 households (18 persons) --- one
+   or two households and at most three persons per zone. The 53 left uncovered are
+   reported rather than invented: 40 sit in codes absent from the extract, 10 in a
+   padding code, and 3 had no candidate that survived the checks. The zone fitter,
+   not this step, decides how often an appended household is replicated.};
+
+\end{tikzpicture}

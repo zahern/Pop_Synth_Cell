@@ -1,0 +1,152 @@
+\documentclass[../main.tex]{subfiles}
+\externaldocument[I-]{../files/Acronyms} 
+% Conditionally load glossary setup for standalone compilation
+
+
+\newif\ifstandalone
+\standalonetrue % Set to true for standalone compilation
+    
+\begin{document}
+
+Activity data can be described by a schedule that includes time, location, 
+purpose, and mode of movement.
+
+\section{SIMS}
+SAVSIM models travel behavior based on individual activities, such as going to work, school, shopping, or recreation, rather than just trips between origins and destinations. \citep{SACSIM}
+
+
+MATSIM MATSim operates by simulating each trip across the
+road network, using a dynamic traffic assignment methodology to route individual vehicles
+from origin to destination
+
+
+
+In Jafarai (2022) they use the Victorian (VICTORIAN INTEGRATED SURVERY FOR Travel and ACTIVITY (VISTA)
+
+\citep{joubert} can generate activity chain and generation based on the strucutral variables along.
+
+
+
+
+%% TRAVEL DEMAND MODELS
+
+\section*{Summary of the Four Steps}
+
+\begin{tabular}{|>{\raggedright\arraybackslash}m{4cm}|>{\raggedright\arraybackslash}m{6cm}|>{\raggedright\arraybackslash}m{6cm}|}
+\hline
+\textbf{Step} & \textbf{Key Question} & \textbf{Output} \\ \hline
+\textbf{Trip Generation} & How many trips? & Number of trip productions and attractions per zone. \\ \hline
+\textbf{Trip Distribution} & Where are trips going? & Trip matrix (origin-destination pairs). \\ \hline
+\textbf{Mode Choice} & How are people traveling? & Trips by mode for each origin-destination pair. \\ \hline
+\textbf{Traffic Assignment} & What routes are being used? & Traffic volumes on roadways or transit systems. \\ \hline
+\end{tabular}
+
+\section*{Limitations of the Four-Step Model}
+
+Althouj the four-step model remains widely used, it has limitations:
+
+\subsection*{1. Simplistic Assumptions}
+\begin{itemize}
+    \item Assumes trips are independent and doesn't consider activity chaining (e.g., home $\rightarrow$ work $\rightarrow$ shopping $\rightarrow$ home).
+\end{itemize}
+
+\subsection*{2. Static Analysis}
+\begin{itemize}
+    \item Doesn't account for dynamic changes in travel behavior (e.g., telecommuting or changes in traffic conditions throughout the day).
+\end{itemize}
+
+\subsection*{3. Aggregated Approach}
+\begin{itemize}
+    \item Operates at the zone level, which may oversimplify individual travel behaviours and preferences.
+\end{itemize}
+
+\subsection*{4. Mode and Route Independence}
+\begin{itemize}
+    \item Mode choice and trip distribution are often treated as independent, which may not reflect real-world interactions.
+\end{itemize}
+%% ABMS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ Unlike traditional four-step travel demand models, ActivitySim focuses on individual decision-making at an activity and trip level \citep{GalliActivitySim:Simulation}.
+It models how people choose activities, destinations, travel modes, and times of travel based on their attributes and preferences.
+
+Simulates the entire day of each individual by generating an activity schedule, which includes:
+\begin{itemize}
+\item Activity types (e.g., work, school, shopping, leisure, home).
+\item Start and end times for each activity.
+\item Location of activities.
+\item Travel modes and routes between activities.
+\end{itemize}
+
+
+How ActivitySim Works
+Inputs:
+\begin{itemize}
+    \item  Synthetic population data (e.g., demographics, household attributes).
+\item Land use and transportation network data (e.g., locations of jobs, schools, shopping centers).
+\item Travel survey data for model calibration and validation.
+\end{itemize}
+
+
+Processes:
+\begin{itemize}
+    \item 
+Models individual activity and travel choices using discrete choice models.
+\item Simulates daily schedules, including activity sequences, travel modes, and trip chaining.
+\end{itemize}
+Outputs:
+\begin{itemize}
+\item Detailed activity and trip data for the synthetic population, such as:
+\item Activity participation and duration.
+\item Trip origins, destinations, modes, and times.
+\item Aggregate travel demand patterns for policy analysis and transportation planning
+\end{itemize}
+
+
+\citep{Tozluoglu2023APatterns} considered four type of activities, home, school work and other, ans assumes, an agent starts at home and ends at home
+
+
+
+
+
+
+
+Assumptions
+\begin{itemize}
+    \item Level of Activity Participation in an Agent
+    \item Number of Activitiy types
+\end{itemize}
+
+Types of Activities ::
+\begin{itemize}
+    \item Home
+    \item School
+    \item Work
+    \item Other
+\end{itemize}
+
+
+The activity generation component has four steps to create an activity schedule for each agent . Defining the activity participation of each agent. deduce the duration of each activity type in the set and assign an activity sequence. Finally, we create activity schedules for each individual.
+
+For each agent in the synthetic population, we first assign a set of activity types showing the activity participation during the given day. Four types of activities are considered: home (H), work (W), school (S), and other (O), like visiting shops, restaurants, etc. We assume that each agent visits their home at least once a day. Given the agent's socio-demographic attributes, we use a generative probabilistic model to create a set of activity types, on the basis on the travel survery \citep{Jafari2022BuildingModels}. 
+
+
+
+
+The activity duration of each activity type is determined through a two-step method. Using another generative probabilistic model, we first jointly deduce broad duration classes (low, moderate, or high) for the different activity types, capturing the correlation between the duration of the different activity types and socio-demographic attributes. We then estimate the total daily travel time for each agent in the form of range classes, 
+ where the lower limit of the range of its daily travel time is 
+ and the upper limit is 
+. After assigning the broad travel time class, we determine each activity type's hourly duration. The hourly probability distribution of a given activity type is predicted using a neural netowkr on the travel survey. Then, we sample the duration of all activity types until they collectively satisfy the constraint 
+
+\[
+24 \, \text{hours} - \overline{t_{\text{TT}}} \leq t_{\text{H}} + t_{\text{W}} + t_{\text{S}} + t_{\text{O}} < 24 \, \text{hours} - \underline{t_{\text{TT}}}
+\]
+
+
+Next, we assign an activity sequence such as home-work-other-home to the agents with known activity types and their durations. An activity sequence comprises the type, order, and frequency of activities participated in a day. individuals with similar socio-demographic attributes and are assumed activity type duration would have similar activity sequences \citep{Lum2016AMatching}. 
+
+
+We first choose a set of candidate individuals from the travel survey, considering individuals having the same activity participation and having as many similar socio-demographic attributes as possible. To find the most similar individual among candidates, we use the daily activity duration and calculate the Euclidean distance between activity duration tuples (tH,tW,tS,tO) of individuals. For an agent, the survey participant with the smallest Euclidean distance is selected, and then their sequence is directly assigned to the agent.
+After activity types, durations, and sequences are ready, we generate the agents’ activity schedule that contains all their activity instances’ start and end times. We assume the day starts and ends at 3 AM since this is the time of day with the least amount of individuals in motion, according to the travel survey.
+We first model the start and end times of the 3 AM activity, which helps arrange the remaining activities using the assigned activity sequences and duration. An NNC is trained to predict 3 AM activity's start and end times. To determine the start and end times of the remaining activities in a sequence (i.e., the activities do not take place at 3 AM), we equally distribute the activity's total duration among its instances in the sequence. For example, if an agent participates in a work activity, followed by other activity types, and then returns to work, the duration of work activities in both instances will be equal.
+
+\end{document}

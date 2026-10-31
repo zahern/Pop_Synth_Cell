@@ -1,0 +1,117 @@
+#!/bin/bash -l
+#PBS -N synth_cp_sa
+#PBS -l walltime=48:00:00
+#PBS -l select=1:ncpus=4:mem=64GB
+#PBS -j n
+#PBS -m abe
+#PBS -r y
+
+# =============================================================================
+# Stage CP-SA — SA baseline over the CP feasible pool (all zones, single job).
+# Split out of stage_cp_mip.pbs for the 2026-10-09 parallel catch-up so the
+# slow MIP chunks don't starve the fast SA baseline of walltime.
+#
+# Oct-2026: this serial all-zones job managed only 21 of ~371 zones before
+# being killed at the walltime limit.  Prefer submit_cp_sa_chunks.sh, which
+# splits the same work into parallel chunks with per-chunk markers.
+# This script is kept for small ZONES subsets and debugging.
+#
+# Env vars: SYNTH_POP, CENSUS_DIR, SA_ITER, ZONES (optional subset),
+#           CPU_ENV_NAME, CPU_ENV_PREFIX
+# =============================================================================
+
+set -euo pipefail
+
+# Oct-2026: this script had no ERR trap and wrote no completion marker, so the
+# run that was SIGKILLed at the walltime limit (job 26593125, Exit_status -29)
+# looked identical to a clean one from the filesystem alone.  Teed to both
+# streams so failures appear in .log and .err.
+_fail() {
+  local line="$1" cmd="$2" rc="$3"
+  echo ""
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  echo "  STAGE CP-SA FAILED"
+  echo "  Line : $line   Cmd : $cmd   RC : $rc"
+  echo "  Time : $(date)   Job : ${PBS_JOBID:-local}"
+  if [[ "$rc" == "137" || "$rc" == "-29" ]]; then
+    echo "  HINT : likely walltime or OOM kill - use submit_cp_sa_chunks.sh to"
+    echo "         split this work into parallel chunks instead."
+  fi
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  exit "$rc"
+}
+trap '_fail $LINENO "$BASH_COMMAND" $?' ERR
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+
+# ---- paper hold-out basis (19 in-sample tables) --------------------------
+# The live data_sa2_controls directory also holds the 7 held-out tables; fitting
+# from it would optimise against them. Build and use the 19-table directory.
+PAPER19="${PAPER19:-$SYNTH_POP/data_sa2_controls_paper19}"
+if [ ! -d "$PAPER19" ] || [ "$(ls -1 "$PAPER19"/*.csv 2>/dev/null | wc -l)" -lt 19 ]; then
+  mkdir -p "$PAPER19"
+  for t in indp sexp typp mtwp occp mstp incp stup rlhp hrsp heap qallp qalfp \
+           rntrd mrerd vehrd nprd hind strd; do
+    cp -f "$SYNTH_POP/data_sa2_controls/sa2${t}.csv" "$PAPER19/" 2>/dev/null || true
+  done
+fi
+export SA_CONTROL_DIR="$PAPER19"
+echo "  control basis: $SA_CONTROL_DIR ($(ls -1 "$SA_CONTROL_DIR"/*.csv 2>/dev/null | wc -l) tables)"
+
+CENSUS_DIR="${CENSUS_DIR:-/home/ahernz/Population_Synth}"
+SA_ITER="${SA_ITER:-1000}"
+
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+export USE_HPC=1
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+
+CENSUS_CSV="$CENSUS_DIR/LINKED_DATA_national.csv"
+[[ -f "$CENSUS_CSV" ]] || { echo "ERROR: $CENSUS_CSV not created"; exit 1; }
+
+echo "================================================================"
+echo "  Stage CP-SA — CP-pool SA baseline"
+echo "  Host : $(hostname)   Job : ${PBS_JOBID:-local}   Start : $(date)"
+echo "================================================================="
+
+if [[ -n "${ZONES:-}" ]]; then
+    # shellcheck disable=SC2086
+    "$PYTHON_BIN" -u "$SYNTH_POP/cp_pool_sa.py" \
+        --census "$CENSUS_CSV" --pool "${POOL_OVERRIDE:-$SYNTH_POP/outputs/feasible_pool.csv}" \
+        --max-iter "$SA_ITER" --zones $ZONES
+else
+    "$PYTHON_BIN" -u "$SYNTH_POP/cp_pool_sa.py" \
+        --census "$CENSUS_CSV" --pool "${POOL_OVERRIDE:-$SYNTH_POP/outputs/feasible_pool.csv}" \
+        --max-iter "$SA_ITER"
+fi
+
+# --- Completion marker (written only after python exits 0) --------------------
+# Chunk-mode aware (Oct-2026): chunk jobs write cp_pool_rssz_summary_chunk<ID>
+# .csv, not the monolithic summary — requiring the latter failed all 24 Oct-13
+# chunks with exit 1 AFTER all zones fitted. Merge chunk summaries at the end.
+MARK_DIR="$SYNTH_POP/outputs/cp_pool_results/.done"
+mkdir -p "$MARK_DIR"
+if [[ -n "${CHUNK_ID:-}" ]]; then
+  SUM="$SYNTH_POP/outputs/cp_pool_results/cp_pool_rssz_summary_chunk${CHUNK_ID}.csv"
+  MARK="$MARK_DIR/cp_sa_chunk${CHUNK_ID}.done"
+else
+  SUM="$SYNTH_POP/outputs/cp_pool_results/cp_pool_rssz_summary.csv"
+  MARK="$MARK_DIR/cp_sa_all.done"
+fi
+{
+  echo "chunk_id=${CHUNK_ID:-all}"
+  echo "zones=${ZONES:-all}"
+  echo "finished=$(date -Is)"
+  echo "summary=${SUM}"
+  echo "summary_exists=$([[ -f "$SUM" ]] && echo yes || echo no)"
+} > "$MARK"
+echo "  marker : $MARK"
+if [[ ! -f "$SUM" ]]; then
+    echo "  WARNING: $SUM was not written - cp_pool_sa.py produced no usable zones."
+    exit 1
+fi
+
+echo "  Stage CP-SA COMPLETE : $(date)"
