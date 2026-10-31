@@ -41,7 +41,8 @@
 # Env vars:
 #   SYNTH_POP, CENSUS_DIR, CPU_ENV_NAME, CPU_ENV_PREFIX
 #   CP_TARGET_PER_CELL (5), CP_MAX_INFILL_CELLS (30000)
-#   EXPAND_REP_MAX (40), EXPAND_MAX_CELLS (4000), EXPAND_TIME_LIMIT (30)
+#   EXPAND_REP_MAX (40), EXPAND_MAX_CELLS (8000), EXPAND_MAX_HOUSEHOLDS (128),
+#   EXPAND_MAX_PERSONS (512), EXPAND_TIME_LIMIT (60)
 #   ZONES_FILE / ZONES_LIMIT  restrict step 3 to a subset (smoke testing)
 #   SUBMIT_FITS=1             also submit MIP fits for the expanded pool
 # =============================================================================
@@ -127,8 +128,10 @@ cp -f "$POOL" "$SYNTH_POP/outputs/cp_pool_results/cp_feasible_pool.csv"
 # ---- 3. MIP pool expansion ---------------------------------------------------
 EXPAND_ARGS=(--pool "$POOL" --census "$CENSUS_CSV" --mode joint
              --rep-max "${EXPAND_REP_MAX:-40}"
-             --max-transplant-cells "${EXPAND_MAX_CELLS:-4000}"
-             --joint-time-limit "${EXPAND_TIME_LIMIT:-30}"
+             --max-transplant-cells "${EXPAND_MAX_CELLS:-8000}"
+             --max-new-households "${EXPAND_MAX_HOUSEHOLDS:-128}"
+             --max-new-persons "${EXPAND_MAX_PERSONS:-512}"
+             --joint-time-limit "${EXPAND_TIME_LIMIT:-60}"
              --out "$EXPANDED"
              --report "$SYNTH_POP/outputs/cp_expand_report.json")
 [[ -n "${ZONES_FILE:-}" ]]  && EXPAND_ARGS+=(--zones-file "$ZONES_FILE")
