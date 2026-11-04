@@ -16,13 +16,18 @@ environment; on the HPC every python command is run inside a PBS job (the
 
 ```bash
 python build_feasible_pool_cp.py \
-    --microdata "$CENSUS_CSV" \
-    --controls data_sa2_controls \
+    --census "$CENSUS_CSV" \
+    --control-attrs SEXP AGEP MSTP HEAP OCCP INCP LFSP EMPP HRSP QALFP QALLP \
+                    RLHP MTWP NPRD VEHRD MRERD RNTRD STRD HIND BEDRD HHCD \
+    --min-count 5 --target-per-cell 5 --max-infill-cells 30000 \
+    --coverage-tables --coverage-per-category 5 \
     --out outputs/feasible_pool.csv
 ```
 
-The exact production call, including the structural-rule switches, is in
-`pbs/stage_cp_pool.pbs`.
+The exact production call, including the fusion step that creates
+`LINKED_DATA_national.csv`, is in `pbs/stage_cp_pool.pbs`. The fusion script
+itself belongs to the companion microdata pipeline and is not part of this
+repository; the fused census is an input (see README, Data).
 
 ### 2. MIP pool expansion
 

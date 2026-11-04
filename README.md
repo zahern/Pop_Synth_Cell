@@ -70,7 +70,10 @@ Three inputs are needed:
 1. **ABS 2021 Census 5% Basic microdata** (dwelling, family and person CSVs).
    These are large and are not redistributed here. Obtain them from the ABS
    and set `config.POP_SYNTH_DIR` (or the `SYNTH_POP`/`CENSUS_CSV` environment
-   variables used by the PBS scripts).
+   variables used by the PBS scripts). The CP stage consumes the fused
+   national file `LINKED_DATA_national.csv`; the fusion step
+   (`step_0b_fuse_national.py`) belongs to the companion microdata pipeline and
+   is not part of this repository.
 2. **SA2 control tables** — included in `data_sa2_controls*/`.
 3. **Zone lists** — `pbs/zones_371.txt` is the 371-zone scope; the fitted
    cohort is that list minus `301031014`, `304041102`, `310021279` and
