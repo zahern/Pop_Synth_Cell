@@ -147,7 +147,7 @@ CENSUS_MICRODATA = os.environ.get("CENSUS_MICRODATA_FILE", _DEFAULT_SEED)
 # Override to reproduce a specific paper basis, e.g. the 19 in-sample tables the
 # manuscript reports (data_sa2_controls_paper19). Default: the full live set.
 SA_CONTROL_DIR = os.environ.get(
-    "SA_CONTROL_DIR", os.path.join(SYNTH_POP_DIR, "data_sa2_controls"))
+    "SA_CONTROL_DIR", os.path.join(SYNTH_POP_DIR, "data_sa2_controls_paper19"))
 
 # ---------------------------------------------------------------------------
 # Hold-out declaration (must match pbs/paper_analysis.pbs)
