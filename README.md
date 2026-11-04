@@ -55,7 +55,13 @@ pip install -r requirements.txt
 
 The PBS scripts assume a conda environment named `syn_env` under
 `/home/ahernz/miniconda3/envs`; override `CPU_ENV_PREFIX` and `CPU_ENV_NAME`,
-or edit `config.py`.
+or edit `config.py`. The submitters also default `SYNTH_POP` to the original
+HPC path, so from a fresh clone export the repository root first:
+
+```bash
+export SYNTH_POP="$PWD"
+export SA_CONTROL_DIR="$PWD/data_sa2_controls_paper19"
+```
 
 ## Data
 
