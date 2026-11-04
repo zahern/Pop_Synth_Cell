@@ -57,6 +57,37 @@ def _looks_like_na_value(value):
     return ("not" in text and ("app" in text or "stated" in text))
 
 
+def _zone_key(value):
+    """Canonical string key for a zone code, independent of column dtype.
+
+    The control tables do not agree on the dtype of their ``sa2`` column: six
+    of them load it as ``str`` and the rest as ``int64``. Comparing a zone code
+    from one family against the other silently matches nothing, which made
+    ``_balance_zone_total_with_na`` believe the zone had no rows at all and
+    inject a synthetic bucket holding the entire zone target. That inflated the
+    table total by the full target (roughly doubled it). Normalising both sides
+    to this key removes the dtype dependence.
+    """
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return text
+
+
+def _zone_mask(data, zone, zone_column="sa2"):
+    """Boolean mask selecting one zone, robust to str/int dtype disagreement."""
+    if zone_column not in data.columns:
+        return pd.Series(False, index=data.index)
+    return data[zone_column].map(_zone_key) == _zone_key(zone)
+
+
 def _pick_na_bucket_index(zone_df, key_columns):
     """Find the best existing NA-like row index for a zone table slice."""
     if zone_df.empty:
@@ -85,7 +116,7 @@ def _pick_na_bucket_index(zone_df, key_columns):
 
 def _ensure_na_bucket(data, zone, key_columns, zone_column="sa2", count_column="count"):
     """Ensure a zone table has an NA row available for balancing totals."""
-    zone_mask = data[zone_column] == zone
+    zone_mask = _zone_mask(data, zone, zone_column)
     zone_df = data.loc[zone_mask]
     na_idx = _pick_na_bucket_index(zone_df, key_columns)
     if na_idx is not None:
@@ -120,27 +151,24 @@ def _balance_zone_total_with_na(
     count_column="count",
 ):
     """Force a zone table total to target_total by adjusting NA (then largest bins if needed)."""
-    zone_mask = data[zone_column] == zone
+    zone_mask = _zone_mask(data, zone, zone_column)
     zone_idx = data.index[zone_mask]
     if len(zone_idx) == 0:
-        data, na_idx, na_bucket_created = _ensure_na_bucket(
-            data,
-            zone,
-            key_columns,
-            zone_column=zone_column,
-            count_column=count_column,
-        )
-        data[count_column] = pd.to_numeric(data[count_column], errors="coerce").fillna(0).round().astype(int)
-        data.loc[na_idx, count_column] = int(target_total)
+        # The zone is absent from this table. It therefore carries no target
+        # for the zone, and inventing one is what doubled the individual
+        # universe: the previous branch created a synthetic NA row and set it
+        # to the WHOLE zone target instead of the residual, so the table total
+        # became target + original. Leave the table untouched and record it.
         return data, {
             "before_total": 0,
             "target_total": int(target_total),
-            "diff": int(target_total),
-            "na_added": int(target_total),
+            "diff": 0,
+            "na_added": 0,
             "na_removed": 0,
             "other_removed": 0,
-            "na_bucket_created": na_bucket_created,
-            "after_total": int(target_total),
+            "na_bucket_created": False,
+            "after_total": 0,
+            "zone_absent": True,
         }
 
     current_total = int(pd.to_numeric(data.loc[zone_idx, count_column], errors="coerce").fillna(0).sum())
@@ -173,7 +201,7 @@ def _balance_zone_total_with_na(
     if diff > 0:
         data.loc[na_idx, count_column] = int(data.loc[na_idx, count_column]) + diff
         na_added = diff
-        after_total = int(pd.to_numeric(data.loc[data[zone_column] == zone, count_column], errors="coerce").fillna(0).sum())
+        after_total = int(pd.to_numeric(data.loc[_zone_mask(data, zone, zone_column), count_column], errors="coerce").fillna(0).sum())
         return data, {
             "before_total": current_total,
             "target_total": int(target_total),
@@ -195,7 +223,7 @@ def _balance_zone_total_with_na(
     na_removed += take
 
     if remaining_to_remove <= 0:
-        after_total = int(pd.to_numeric(data.loc[data[zone_column] == zone, count_column], errors="coerce").fillna(0).sum())
+        after_total = int(pd.to_numeric(data.loc[_zone_mask(data, zone, zone_column), count_column], errors="coerce").fillna(0).sum())
         return data, {
             "before_total": current_total,
             "target_total": int(target_total),
@@ -207,7 +235,7 @@ def _balance_zone_total_with_na(
             "after_total": after_total,
         }
 
-    candidates = data.loc[data[zone_column] == zone].sort_values(count_column, ascending=False)
+    candidates = data.loc[_zone_mask(data, zone, zone_column)].sort_values(count_column, ascending=False)
     for idx in candidates.index:
         if idx == na_idx:
             continue
@@ -221,7 +249,7 @@ def _balance_zone_total_with_na(
         if remaining_to_remove <= 0:
             break
 
-    after_total = int(pd.to_numeric(data.loc[data[zone_column] == zone, count_column], errors="coerce").fillna(0).sum())
+    after_total = int(pd.to_numeric(data.loc[_zone_mask(data, zone, zone_column), count_column], errors="coerce").fillna(0).sum())
     return data, {
         "before_total": current_total,
         "target_total": int(target_total),
@@ -240,11 +268,12 @@ def normalize_counts(
     count_column='count',
     audit_path=None,
     audit_focus_zone=None,
+    zones=None,
 ):
     """
     Reconcile control-table totals to one explicit universe per SA zone.
 
-    Individual controls use the largest available person total for backwards
+    Individual controls are scaled to the largest available person total for backwards
     compatibility. Household controls use HHCD when present, because the
     household comparison and dwelling-count target are defined on that
     universe. If HHCD is unavailable, the largest available household total is
@@ -265,12 +294,22 @@ def normalize_counts(
     updated_individual_control_tables = copy.deepcopy(individual_control_tables)
     updated_household_control_tables = copy.deepcopy(household_control_tables)
 
-    # Gather all unique SA zones from individual and household tables
-    all_zones = set()
-    for control_table in updated_individual_control_tables.values():
-        all_zones.update(control_table['data'][zone_column].unique())
-    for control_table in updated_household_control_tables.values():
-        all_zones.update(control_table['data'][zone_column].unique())
+    # Gather all unique SA zones from individual and household tables.
+    # Zones are pooled as canonical keys, never as raw column values: the tables
+    # mix str and int64 sa2 columns, and a raw set would hold both 112011236 and
+    # "112011236" as separate zones while every per-zone comparison matched only
+    # one family (see _zone_key).
+    # ``zones`` restricts the pass to the zones the caller is actually fitting;
+    # the per-zone work is independent, so the result is identical and a
+    # single-zone fit no longer pays for all 368 zones.
+    if zones is not None:
+        all_zones = {_zone_key(z) for z in zones}
+    else:
+        all_zones = set()
+        for control_table in updated_individual_control_tables.values():
+            all_zones.update(_zone_key(v) for v in control_table['data'][zone_column].unique())
+        for control_table in updated_household_control_tables.values():
+            all_zones.update(_zone_key(v) for v in control_table['data'][zone_column].unique())
 
     audit_rows = []
 
@@ -282,13 +321,13 @@ def normalize_counts(
         # Determine the max count for the current zone in individual tables
         for control_table in updated_individual_control_tables.values():
             data = control_table['data']
-            filtered_data = data[data[zone_column] == zone]
+            filtered_data = data[_zone_mask(data, zone, zone_column)]
             max_individual_count = max(max_individual_count, filtered_data[count_column].sum())
 
         # Update all individual tables to match the max count
         for control_table in updated_individual_control_tables.values():
             data = control_table['data']
-            filtered_data = data[data[zone_column] == zone]
+            filtered_data = data[_zone_mask(data, zone, zone_column)]
             current_total = filtered_data[count_column].sum()
 
             if current_total > 0:  # Only scale if the current total is greater than 0
@@ -336,7 +375,7 @@ def normalize_counts(
         )
         if hhcd_key is not None:
             hhcd_data = updated_household_control_tables[hhcd_key]["data"]
-            hhcd_zone = hhcd_data[hhcd_data[zone_column] == zone]
+            hhcd_zone = hhcd_data[_zone_mask(hhcd_data, zone, zone_column)]
             max_household_count = int(
                 pd.to_numeric(hhcd_zone[count_column], errors="coerce")
                 .fillna(0)
@@ -348,7 +387,7 @@ def normalize_counts(
         if hhcd_key is None:
             for control_table in updated_household_control_tables.values():
                 data = control_table['data']
-                filtered_data = data[data[zone_column] == zone]
+                filtered_data = data[_zone_mask(data, zone, zone_column)]
                 max_household_count = max(
                     max_household_count,
                     filtered_data[count_column].sum(),
@@ -357,7 +396,7 @@ def normalize_counts(
         # Update all household tables to match the max count
         for control_table in updated_household_control_tables.values():
             data = control_table['data']
-            filtered_data = data[data[zone_column] == zone]
+            filtered_data = data[_zone_mask(data, zone, zone_column)]
             current_total = filtered_data[count_column].sum()
 
             if current_total > 0:  # Only scale if the current total is greater than 0
@@ -2484,15 +2523,22 @@ def build_control_dicts(control_tables, zone):
 
 
 def _resolve_control_csv_path(csv_file_path):
-    """Resolve a control CSV path, preferring control_tables/ inputs.
+    """Resolve a control CSV path, preferring the declared control basis.
 
     Search order:
+    0) $SA_CONTROL_DIR/<filename>  -- the declared fitting basis (the 19-table
+       paper basis).  Checked first so a caller cannot silently fall back to
+       data_sa2_controls, which also contains the 7 held-out tables.
     1) control_tables/<filename>
     2) original provided path
     3) data_sa2_controls/<filename>
     """
     base_name = os.path.basename(csv_file_path)
-    candidates = [
+    candidates = []
+    basis = os.environ.get("SA_CONTROL_DIR")
+    if basis:
+        candidates.append(os.path.join(basis, base_name))
+    candidates += [
         os.path.join("control_tables", base_name),
         csv_file_path,
         os.path.join("data_sa2_controls", base_name),

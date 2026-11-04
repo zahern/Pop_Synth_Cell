@@ -1,0 +1,26 @@
+#!/bin/bash -l
+#PBS -N hhts_attach
+#PBS -l walltime=02:00:00
+#PBS -l select=1:ncpus=1:mem=32GB
+#PBS -j oe
+#PBS -m abe
+
+# Attach observed HHTS/QTS travel attributes to the merged expansion pool.
+set -euo pipefail
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+POOL="${POOL:?missing POOL}"
+HHTS_CENSUS="${HHTS_CENSUS:?missing HHTS_CENSUS}"
+OUT="${OUT:?missing OUT}"
+REPORT="${REPORT:-${OUT%.csv}.attach_report.json}"
+HHTS_HOUSEHOLDS="${HHTS_HOUSEHOLDS:-}"
+CSF_MAP="${CSF_MAP:-}"
+
+cd "$SYNTH_POP"
+ARGS=(--pool "$POOL" --hhts-census "$HHTS_CENSUS" --out "$OUT" --report "$REPORT")
+[[ -n "$HHTS_HOUSEHOLDS" ]] && ARGS+=(--hhts-households "$HHTS_HOUSEHOLDS")
+[[ -n "$CSF_MAP" ]] && ARGS+=(--csf-map "$CSF_MAP")
+"$PYTHON_BIN" -u attach_hhts_to_pool.py "${ARGS[@]}"

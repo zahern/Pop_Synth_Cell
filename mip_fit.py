@@ -24,8 +24,9 @@ RELAXED (multiplied by --relax-factor) and re-solved, up to --max-relax rounds.
 The reported tolerance is therefore the tightest one admitting a feasible
 solution, which is a useful zone-level diagnostic in its own right.
 
-Because the candidate set is pre-filtered to the zone (by REGUCP concordance),
-the problem stays sparse and solvable: typically 10^4-10^5 binary variables.
+Because the candidate set is pre-filtered to the zone's own SA4 slice (by REGUCP
+concordance) and never falls back to the global pool, the problem stays sparse
+and solvable: typically 10^4-10^5 binary variables.
 
 Solver: HiGHS via scipy.optimize.milp.  If that is unavailable or times out, the
 LP relaxation is solved and rounded (--allow-lp-fallback), which for these
@@ -196,24 +197,56 @@ def zone_targets(tables, zone):
     return targets
 
 
-def zone_candidate_pool(pool, zone, sa2_to_regucp):
-    """Pre-filter the CP pool to the households that can plausibly serve `zone`.
+def _sa2_key(value):
+    """Normalise an SA2 code from string, int, or float storage."""
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return ""
+    text = str(value).strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return text
 
-    Uses the SA2 -> REGUCP concordance (the same mechanism the SA stage uses);
-    falls back to the whole pool when the zone is unmapped.  Callers should
-    pass the result through cap_candidates(): an uncapped full-pool fallback
-    (488k households) OOM-kills 64GB nodes and cannot finish in walltime
-    (Oct-2026: mip chunks 02/33 OOM, 23/24/25/29/32/35 walltime-killed).
+
+def zone_candidate_pool(pool, zone, sa2_to_regucp):
+    """Pre-filter the CP pool to the households that can serve `zone`.
+
+    Base records come from the zone's own SA4 microdata slice and never from a
+    global store.  Records constructed for a specific SA2 by expansion are
+    tagged in ``_target_sa2`` and are included only for that exact zone, so a
+    constructed household is never shared with a sibling SA2 in the same SA4.
+    The result is therefore a per-SA2 pool: the base slice plus that zone's own
+    constructed additions.
+
+    An empty result is a structural residual for the zone, not an invitation to
+    borrow another SA2's or SA4's sample.
     """
+    target_col = next((c for c in pool.columns
+                       if str(c).lower() == "_target_sa2"), None)
+    own = pool.iloc[0:0]
+    tagged = pd.Series(False, index=pool.index)
+    if target_col is not None:
+        tagged = pool[target_col].notna()
+        own = pool[pool[target_col].map(_sa2_key) == _sa2_key(zone)]
+
     if "regucp" not in pool.columns:
-        return pool, "full-pool (no regucp column)"
+        if len(own):
+            return own, f"constructed-only ({len(own)} records)"
+        return pool.iloc[0:0], "empty (no regucp column)"
+
     reg = sa2_to_regucp.get(str(zone))
     if not reg:
-        return pool, "full-pool (zone not in concordance)"
-    sub = pool[_normalize_zone_values(pool["regucp"]) == str(reg)]
-    if len(sub) == 0:
-        return pool, "full-pool (no records for REGUCP)"
-    return sub, f"REGUCP={reg}"
+        if len(own):
+            return own, f"constructed-only ({len(own)} records)"
+        return pool.iloc[0:0], "empty (zone not in concordance)"
+
+    base = pool[(_normalize_zone_values(pool["regucp"]) == str(reg))
+                & ~tagged]
+    if len(own):
+        sub = pd.concat([base, own], ignore_index=True)
+        return sub, f"REGUCP={reg} + {len(own)} constructed"
+    if len(base) == 0:
+        return base, f"empty REGUCP={reg} (structural residual)"
+    return base, f"REGUCP={reg}"
 
 
 def cap_candidates(cand, person_target, max_candidates=150000,
@@ -227,8 +260,8 @@ def cap_candidates(cand, person_target, max_candidates=150000,
 
     Rationale: a 300-person zone needs ~130 households; choosing among 488k
     binaries adds nothing but memory (OOM) and branch-and-bound hours.  The
-    cap also makes the full-pool fallback (unmapped zones) tractable without
-    inventing geography for them.
+    cap is applied only within the zone's own SA4 slice; it is never used to
+    make a global-pool fallback tractable, because there is no such fallback.
     """
     import math as _math
     hh_sizes = cand.groupby("abshid").size() if "abshid" in cand.columns \
@@ -980,6 +1013,17 @@ def main():
                          "solver": "LP relaxation + integerisation" if a.solver == "lp" else "MIP"})
             continue
         cand, how = zone_candidate_pool(pool, zone, sa2_to_regucp)
+        if len(cand) == 0:
+            # No fallback to the global pool: the zone's SA4 slice is the
+            # candidate universe, and an empty slice is a structural residual.
+            print(f"Zone {zone}: {how} — structural residual, zone skipped")
+            rows.append({**audit_base, "status": "failed",
+                         "failure_reason": "empty_zone_candidate_slice",
+                         "candidate_source": how,
+                         "households_selected": 0,
+                         "candidate_types_selected": 0, "persons": 0,
+                         "solver": "LP relaxation + integerisation" if a.solver == "lp" else "MIP"})
+            continue
         cand, n_bad_hh, n_bad_rows = drop_inconsistent_households(
             cand, hh_keys)
         if n_bad_hh:
@@ -1072,13 +1116,21 @@ def main():
 
     if rows:
         out = pd.DataFrame(rows)
-        out.to_csv(os.path.join(RESULTS_DIR, "cp_mip_summary.csv"), index=False)
+        # When several chunks run concurrently they all share RESULTS_DIR.  A
+        # single shared cp_mip_summary.csv is then a race: each job overwrites
+        # it and the per-chunk copy can pick up another chunk's rows.  Write
+        # the chunk's own file directly instead (mirrors cp_pool_sa.py).
+        _chunk = os.environ.get("CHUNK_ID", "").strip()
+        _summary_name = (f"cp_mip_summary_chunk{_chunk}.csv" if _chunk
+                         else "cp_mip_summary.csv")
+        out.to_csv(os.path.join(RESULTS_DIR, _summary_name), index=False)
         out.loc[out["status"] != "success"].to_csv(
-            os.path.join(RESULTS_DIR, "zone_failure_manifest.csv"), index=False
+            os.path.join(RESULTS_DIR, f"zone_failure_manifest{'_chunk' + _chunk if _chunk else ''}.csv"),
+            index=False
         )
         ok = out["households_selected"] > 0
         print(f"\nWrote {len(out)} zone rows ({int(ok.sum())} solved) to "
-              f"{RESULTS_DIR}/cp_mip_summary.csv")
+              f"{RESULTS_DIR}/{_summary_name}")
         if ok.any():
             print(f"  median reported metric: {out.loc[ok, 'tolerance'].median():.3f}")
             print(f"  median max rel dev    : {out.loc[ok, 'max_rel_dev'].median():.3f}")

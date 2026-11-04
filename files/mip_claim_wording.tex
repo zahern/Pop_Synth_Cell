@@ -1,0 +1,76 @@
+% =====================================================================
+% (c) Corrected wording for the MIP / pool-expansion claims.
+% Drafted 2026-11-04 after auditing mip_pool_joint.py + the fitters
+% (SA_2_level.py) and re-scoring every arm on the full 19 fitted tables.
+%
+% WHY THESE CHANGES
+% -----------------
+% 1. The per-zone program IS a genuine MIP (scipy.optimize.milp: binary
+%    household selectors + coverage slack + marginal-deviation vars). That
+%    much is defensible and can stay.
+% 2. BUT in the released/default path (append_menu_candidates=True) the MIP's
+%    SELECTION does not determine the pool contents: the whole constructed
+%    candidate menu is appended regardless (mip_pool_joint.py, "Pool growth"
+%    block). The MIP only labels mip_joint vs mip_joint_menu. So the pool is
+%    menu-driven, not MIP-driven. Only --coverage-only lets the MIP gate the
+%    pool -- and that arm fits WORSE than the un-expanded CP pool.
+% 3. The coverage sizing nu_c = ceil(E / rep_max), rep_max=40, assumes each
+%    carrier is replicated up to 40x. Neither fitter replicates: SA moves
+%    whole households between remaining/current (each used <= once) and IPU
+%    integerises by Gumbel top-k weighted sampling WITHOUT replacement. So the
+%    pool-level coverage guarantee does not transfer to the fitted population.
+% 4. Reported RSSZ was summed over 11 tables; the 8 dropped tables
+%    (qalfp, qallp, incp, hrsp, strd, indp, typp, stup) are exactly the ones
+%    expansion most perturbs. On all 19 fitted tables no expansion variant
+%    beats the un-expanded CP pool.
+% =====================================================================
+
+% ---- Replace the "what the MIP guarantees" sentence -----------------
+% OLD (overclaims): a MIP solves the pool so that every zero cell is covered.
+% NEW:
+A per-zone mixed-integer program selects a feasible, coverage-minimal set of
+donor--shell households for the zero-capacity cells: binary selectors over a
+constructed candidate menu, soft coverage slack, and a secondary
+marginal-deviation term. The program certifies that a feasible set covering the
+sourceable zero cells \emph{exists}; it does not reweight the zone, and in the
+released configuration it does not by itself determine the pool contents, since
+the full constructed menu is appended as additional candidates for the fitter
+(the coverage-minimal selection is a labelled subset of it). The program is a
+support-repair step, not a zone fit.
+
+% ---- Replace the rep_max carrier-requirement guarantee --------------
+% OLD: every sourceable zero cell receives its carrier requirement
+%      nu_c = ceil(E_{z,k,m}/r_max), which replication at r_max can then reach.
+% NEW:
+For each sourceable zero cell the program adds at least
+$\nu_c=\lceil E_{z,k,m}/r_{\max}\rceil$ distinct carrier households. This closes
+the cell only if the downstream fitter replicates a selected household up to
+$r_{\max}$ times. The simulated-annealing and IPU fitters used here instead draw
+whole households without replacement, so a carrier contributes at most its own
+members to the cell; the added support therefore makes the cell \emph{selectable}
+but does not, on its own, close the zone's deficit for that cell. Matching the
+carrier count to the fitter's realisable multiplicity (or giving the fitter an
+explicit replication count) is required for the support to transfer to the
+fitted population, and is left to \cref{sec:limitations} / future work.
+
+% ---- Add to the evaluation / results text ---------------------------
+% NEW sentence to insert where RSSZ is defined or first reported:
+We report RSSZ summed over all 19 fitted control tables. An earlier 11-table
+summary omitted the eight tables (\texttt{qalfp}, \texttt{qallp}, \texttt{incp},
+\texttt{hrsp}, \texttt{strd}, \texttt{indp}, \texttt{typp}, \texttt{stup}) that the
+pool expansion most affects; on the full basis the expanded-pool arms do not
+improve on the un-expanded constructed pool, and the composition-weighted and
+size-aware variants are substantially worse (driven by \texttt{qalfp} and
+household-size \texttt{nprd} respectively). We therefore present the expansion as
+a feasibility/support-repair contribution, not as a fit improvement.
+
+% ---- Suggested limitation bullet ------------------------------------
+% NEW:
+\item The pool expansion guarantees cell \emph{support}, not improved zone fit.
+Because the fitters select households without replacement while the support
+sizing assumes $r_{\max}$-fold replication, and because the released pipeline
+appends the whole candidate menu rather than only the MIP-selected set, the
+added records do not improve -- and under aggressive composition weighting
+degrade -- the person-level marginals (\texttt{qalfp}, \texttt{hrsp}) on the full
+19-table basis. Closing this requires either a replication-aware fitter or a
+single integer program that selects replication counts directly (see design note).

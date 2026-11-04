@@ -1,0 +1,41 @@
+#!/bin/bash -l
+#PBS -N cp_mip_metrics
+#PBS -l walltime=12:00:00
+#PBS -l select=1:ncpus=4:mem=48GB
+#PBS -j oe
+
+# Full paper metric suite for the CP-MIP arm, after all chunk fits finish.
+# Compute node only: every python call below runs here, never on the login node.
+set -euo pipefail
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+export USE_HPC=1
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+export SA_CONTROL_DIR="${SA_CONTROL_DIR:-$SYNTH_POP/data_sa2_controls_paper19}"
+export CP_MIP_RESULTS_DIR="${CP_MIP_RESULTS_DIR:-$SYNTH_POP/outputs/cp_mip_results}"
+cd "$SYNTH_POP"
+
+echo "host=$(hostname) job=${PBS_JOBID:-local} start=$(date)"
+echo "results=$CP_MIP_RESULTS_DIR  controls=$SA_CONTROL_DIR"
+
+echo "=== [1/4] 11-table paper table (all arms, cp_mip included) ==="
+"$PYTHON_BIN" -u score_paper_arms.py --latex
+
+echo "=== [2/4] full metric suite: RSSZ, TVD, SRMSE, MAE%, pMSE, Cramer, constraints ==="
+"$PYTHON_BIN" -u benchmark_margins.py \
+  --strategies sa_only ipu_only cp_sa cp_ipu cp_mip \
+  --cp-mip-dir "$CP_MIP_RESULTS_DIR" \
+  --all-zones \
+  --output-subdir benchmarking_cp_mip
+
+echo "=== [3/4] held-out RSSZ ==="
+"$PYTHON_BIN" -u heldout_rssz.py
+
+echo "=== [4/4] joint / diversity audit ==="
+"$PYTHON_BIN" -u full_cohort_audit.py
+
+echo "metrics complete $(date)"

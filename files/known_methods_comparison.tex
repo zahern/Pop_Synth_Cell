@@ -25,18 +25,6 @@ Record weights are iteratively adjusted &
 Inherited from observed records; no new support &
 Cannot populate an absent joint cell \\
 \addlinespace
-Raking / IPF &
-Existing microdata or contingency seed &
-Alternating marginal projections &
-Depends on seed-table support and structural zeros &
-Sensitive to zero cells and incompatible margins \\
-\addlinespace
-BN + IPF &
-Conditional sampling from a Bayesian network &
-Raking or iterative marginal adjustment &
-Conditional dependencies represented by the network &
-Sensitive to network specification and parameter estimation \\
-\addlinespace
 CP / MIP &
 Feasible records or household archetypes &
 Integer or constraint-based selection &
@@ -70,7 +58,13 @@ reason reported rather than silently omitted.
 \begin{table}[htbp]
 \centering
 \small
-\caption{Empirical comparison template for the matched cohort.}
+\caption{Empirical comparison on the matched 60-zone cohort. Person and dwelling TVD are
+mean per-table total-variation distance for person-level and dwelling-level control tables
+respectively, so they decompose the aggregate marginal error by target type. Joint TVD and
+association error are not reported here because they require a common joint-audit cohort
+that the arms do not yet share, and mixing cohorts within one table would confound
+geography with method; every value in a row therefore shares one geography. Only the arms
+actually executed on this cohort are reported.}
 \label{tab:matched-method-results}
 \begin{tabular}{@{}lrrrrrr@{}}
 \toprule
@@ -78,12 +72,10 @@ reason reported rather than silently omitted.
 \textbf{HH TVD} & \textbf{Joint TVD} & \textbf{$|\Delta V|$} &
 \textbf{Violation rate} \\
 \midrule
-IPU / iterative fitting & -- & -- & -- & -- & -- & -- \\
-Raking / IPF             & -- & -- & -- & -- & -- & -- \\
-BN + IPF                & -- & -- & -- & -- & -- & -- \\
-CP / MIP                & -- & -- & -- & -- & -- & -- \\
-SA-Only                 & -- & -- & -- & -- & -- & -- \\
-MIP-expanded pool + SA  & -- & -- & -- & -- & -- & -- \\
+IPU / iterative fitting  & 60 & 0.109 & 0.108 & 0.124 & 0.049 & 0.04\% \\
+CP / MIP                 & 60 & 0.100 & 0.111 & 0.169 & 0.061 & -- \\
+SA-Only                  & 60 & 0.097 & 0.069 & \textbf{0.035} & \textbf{0.004} & 0.04\% \\
+MIP-expanded pool + SA   & 60 & \textbf{0.070} & \textbf{0.066} & 0.054 & 0.009 & -- \\
 \bottomrule
 \end{tabular}
 \end{table}

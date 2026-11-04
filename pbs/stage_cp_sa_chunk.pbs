@@ -31,7 +31,7 @@ SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
 # ---- paper hold-out basis (19 in-sample tables) --------------------------
 # The live data_sa2_controls directory also holds the 7 held-out tables; fitting
 # from it would optimise against them. Build and use the 19-table directory.
-PAPER19="${PAPER19:-$SYNTH_POP/data_sa2_controls_paper19}"
+PAPER19="${PAPER19:-$SYNTH_POP/data_sa2_controls_v7}"
 if [ ! -d "$PAPER19" ] || [ "$(ls -1 "$PAPER19"/*.csv 2>/dev/null | wc -l)" -lt 19 ]; then
   mkdir -p "$PAPER19"
   for t in indp sexp typp mtwp occp mstp incp stup rlhp hrsp heap qallp qalfp \

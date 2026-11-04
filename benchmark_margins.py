@@ -196,6 +196,13 @@ _LABEL_TO_CODE = {
     },
 }
 
+# Attributes whose unit of observation is the dwelling.  Synthetic populations
+# repeat them on every member row, so marginal counts must deduplicate to one
+# row per household before comparing with the census household totals.  Without
+# this, every household table is overcounted by the mean household size.
+_HH_ATTRS = {"bedrd", "hcfmf", "hhcd", "tenlld", "hind", "mrerd", "nprd",
+             "rntrd", "vehrd", "strd", "tend"}
+
 
 def tvd(obs_counts, exp_counts):
     """Total Variation Distance.  Range [0, 1]."""
@@ -313,10 +320,16 @@ def zone_metrics(pop_df, control_tables, zone_id):
             exp[key] = exp.get(key, 0) + int(row["count"])
         if not exp:
             continue
+        # Dwelling-level attributes are repeated on every member row: compare
+        # one row per household against the census household totals.
+        attr_key = str(ct.get("attr", "")).lower()
+        frame = pop_df
+        if attr_key in _HH_ATTRS and "abshid" in frame.columns:
+            frame = frame.drop_duplicates("abshid")
         # age5p/hcfmf have no verbatim population column but are derivable from
         # agep / families_in_household (text labels align with the control table).
-        derived = _derived_obs(pop_df, str(ct.get("attr", "")).lower())
-        obs = derived if derived is not None else _obs_counts(pop_df, attr_cols)
+        derived = _derived_obs(frame, attr_key)
+        obs = derived if derived is not None else _obs_counts(frame, attr_cols)
         records.append({
             "zone":      zone_id,
             "table":     tbl_key,
@@ -705,23 +718,45 @@ def _constraint_checks():
         return {}
 
 
+def _household_checks():
+    """Household-level checks: these need the members of one household together.
+
+    Kept apart from the per-record set because they cannot be repaired record by
+    record, and because a size code that disagrees with its members is usually
+    inherited from the input microdata rather than introduced by a fitter.
+    """
+    try:
+        from constraint_rules import HOUSEHOLD_CHECKS
+        return HOUSEHOLD_CHECKS
+    except Exception as exc:            # pragma: no cover - defensive
+        warnings.warn(f"Could not import HOUSEHOLD_CHECKS ({exc}); "
+                      f"household checks will be skipped.")
+        return {}
+
+
 def strategy_repair_rate(zones_dict):
     """Per-strategy hard-constraint violation rate.
 
     Returns
     -------
     summary : dict | None
-        n_records, n_violating_records, repair_rate_pct for the whole strategy.
+        n_records, n_violating_records, repair_rate_pct for the whole strategy,
+        plus n_household_violating_records / household_rate_pct for the checks
+        that need whole households.
     detail : list[dict]
-        One row per violated constraint (descending by count).
+        One row per violated constraint (descending by count), tagged with the
+        level it was checked at.
     """
     checks = _constraint_checks()
-    if not checks or not zones_dict:
+    household = _household_checks()
+    if (not checks and not household) or not zones_dict:
         return None, []
 
     n_total = 0
     n_any = 0
+    n_household = 0
     per_check = {}
+    per_household = {}
     for _zone_id, df in zones_dict.items():
         if df is None or len(df) == 0:
             continue
@@ -741,17 +776,39 @@ def strategy_repair_rate(zones_dict):
             any_mask |= mask
         n_any += int(any_mask.sum())
 
+        hh_mask = pd.Series(False, index=d.index)
+        for desc, fn in household.items():
+            try:
+                mask = fn(d)
+            except Exception:
+                continue
+            mask = pd.Series(mask, index=d.index).fillna(False).astype(bool)
+            cnt = int(mask.sum())
+            if cnt:
+                per_household[desc] = per_household.get(desc, 0) + cnt
+            hh_mask |= mask
+        n_household += int(hh_mask.sum())
+
     if n_total == 0:
         return None, []
     summary = {
         "n_records": n_total,
         "n_violating_records": n_any,
         "repair_rate_pct": 100.0 * n_any / n_total,
+        # Reported on their own scale: folding a household-level mismatch into
+        # the per-record rate above would read as a synthesis defect when the
+        # size code was inherited from the census microdata.
+        "n_household_violating_records": n_household,
+        "household_rate_pct": 100.0 * n_household / n_total,
     }
     detail = [
-        {"constraint": k, "n_violations": v,
+        {"constraint": k, "level": "record", "n_violations": v,
          "pct_of_records": 100.0 * v / n_total}
         for k, v in sorted(per_check.items(), key=lambda kv: -kv[1])
+    ] + [
+        {"constraint": k, "level": "household", "n_violations": v,
+         "pct_of_records": 100.0 * v / n_total}
+        for k, v in sorted(per_household.items(), key=lambda kv: -kv[1])
     ]
     return summary, detail
 

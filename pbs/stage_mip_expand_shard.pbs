@@ -1,0 +1,71 @@
+#!/bin/bash -l
+#PBS -N mip_expand_shard
+#PBS -l walltime=12:00:00
+#PBS -l select=1:ncpus=1:mem=16GB
+#PBS -j oe
+#PBS -m abe
+#PBS -r y
+
+# One zone-shard of the joint pool expansion.  Writes only the households
+# constructed for this shard (--append-only), with a shard-specific ID offset.
+set -euo pipefail
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+APPEND_FLAG="--append-menu-candidates"
+if [ "${EXPAND_COVERAGE_ONLY:-0}" = "1" ]; then
+  APPEND_FLAG="--coverage-only"
+fi
+export USE_HPC=1
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+
+POOL="${POOL:-$SYNTH_POP/outputs/feasible_pool.csv}"
+CENSUS_CSV="${CENSUS_CSV:-/home/ahernz/Population_Synth/LINKED_DATA_national.csv}"
+PAPER19="${PAPER19:-$SYNTH_POP/data_sa2_controls_paper19}"
+export SA_CONTROL_DIR="$PAPER19"
+SHARD_ID="${SHARD_ID:?missing SHARD_ID}"
+ZONES_FILE="${ZONES_FILE:?missing ZONES_FILE}"
+OUT="${OUT:?missing OUT}"
+REPORT="${REPORT:-${OUT%.csv}.report.json}"
+ID_OFFSET="${ID_OFFSET:-0}"
+
+echo "================================================================"
+echo "  expansion shard ${SHARD_ID}"
+echo "  host    : $(hostname)"
+echo "  zones   : $(wc -l < "$ZONES_FILE")"
+echo "  pool    : $POOL"
+echo "  controls: $SA_CONTROL_DIR"
+echo "  out     : $OUT"
+echo "  offset  : $ID_OFFSET"
+echo "  start   : $(date)"
+echo "================================================================"
+
+cd "$SYNTH_POP"
+"$PYTHON_BIN" -u mip_pool.py \
+  --pool "$POOL" \
+  --census "$CENSUS_CSV" \
+  --mode joint \
+  --rep-max "${EXPAND_REP_MAX:-40}" \
+  --max-transplant-cells all \
+  --joint-time-limit "${EXPAND_TIME_LIMIT:-30}" \
+  --donor-policy "${EXPAND_DONOR_POLICY:-global}" \
+  --donors-per-cell "${EXPAND_DONORS_PER_CELL:-4}" \
+  --shells-per-cell "${EXPAND_SHELLS_PER_CELL:-8}" \
+  ${EXPAND_INCLUDE_PARTIAL:+--include-partial-deficits} \
+  ${EXPAND_SIZE_AWARE:+--size-aware-shells} \
+  ${EXPAND_LAMBDA_COMPOSITION:+--lambda-composition $EXPAND_LAMBDA_COMPOSITION} \
+  ${EXPAND_MAX_SIZE7_SHARE:+--max-size7-share $EXPAND_MAX_SIZE7_SHARE} \
+  ${EXPAND_MAX_MTWP17_SHARE:+--max-mtwp17-share $EXPAND_MAX_MTWP17_SHARE} \
+  ${EXPAND_MIN_ADMITTED_HOUSEHOLDS:+--min-admitted-households $EXPAND_MIN_ADMITTED_HOUSEHOLDS} \
+  $APPEND_FLAG \
+  --append-only \
+  --id-offset "$ID_OFFSET" \
+  --zones-file "$ZONES_FILE" \
+  --out "$OUT" \
+  --report "$REPORT"
+
+echo "shard ${SHARD_ID} complete: $(date)"

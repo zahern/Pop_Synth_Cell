@@ -228,13 +228,20 @@ SA_GAN_RESULTS_DIR = os.environ.get(
 )
 
 GAN_VALIDATION_DIR  = os.path.join(OUTPUTS_DIR, "gan_validation")
-SA_ONLY_RESULTS_DIR = os.path.join(OUTPUTS_DIR, "sa_only_results")
-CP_POOL_RESULTS_DIR = os.path.join(OUTPUTS_DIR, "cp_pool_results")
-CP_IPU_RESULTS_DIR  = os.path.join(OUTPUTS_DIR, "cp_ipu_results")
-CP_MIP_RESULTS_DIR  = os.path.join(OUTPUTS_DIR, "cp_mip_results")
+SA_ONLY_RESULTS_DIR = os.environ.get(
+    "SA_ONLY_RESULTS_DIR", os.path.join(OUTPUTS_DIR, "sa_only_results"))
+# Result directories are overridable so a corrected rerun can write to a
+# versioned directory instead of overwriting the previous (invalid) run.
+CP_POOL_RESULTS_DIR = os.environ.get(
+    "CP_POOL_RESULTS_DIR", os.path.join(OUTPUTS_DIR, "cp_pool_results"))
+CP_IPU_RESULTS_DIR  = os.environ.get(
+    "CP_IPU_RESULTS_DIR", os.path.join(OUTPUTS_DIR, "cp_ipu_results"))
+CP_MIP_RESULTS_DIR  = os.environ.get(
+    "CP_MIP_RESULTS_DIR", os.path.join(OUTPUTS_DIR, "cp_mip_results"))
 GA_NSA_RESULTS_DIR  = os.path.join(OUTPUTS_DIR, "ga_nsa_results")
 IPU_GAN_RESULTS_DIR  = os.path.join(OUTPUTS_DIR, "ipu_gan_results")
-IPU_ONLY_RESULTS_DIR = os.path.join(OUTPUTS_DIR, "ipu_only_results")
+IPU_ONLY_RESULTS_DIR = os.environ.get(
+    "IPU_ONLY_RESULTS_DIR", os.path.join(OUTPUTS_DIR, "ipu_only_results"))
 RSSZ_OUTLIER_DIR    = os.path.join(OUTPUTS_DIR, "rssz_outlier")
 HH_MATCH_OUT_DIR    = os.path.join(OUTPUTS_DIR, "hh_match")
 

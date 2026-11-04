@@ -1,65 +1,74 @@
 \FloatBarrier
-\subsection{Candidate-Pool Expansion: Demonstration}
+\subsection{Candidate-Pool Expansion: Per-Zone Audit}
 \label{sec:pool_expansion_audit}
 
-The two programs used by the candidate-pool expansion are Eqs.~\eqref{eq:mip_repair}
-and~\eqref{eq:mip_joint} of Section~\ref{sec:mip_pool_expansion}: a per-candidate
-repair that keeps as much of the real donor profile as the structural rules allow,
-and a single binary selection program per zone that covers every sourceable
-zero-capacity cell while keeping the added set's deviation from the zone's target
-shares small. The released defaults are a 64-household and 256-person budget per
-zone, coverage weight $\lambda_0=10^{5}$ and marginal weight $\lambda_1=10^{-2}$;
-over the 256-person budget the whole marginal term stays below about
-$2.6\times10^{4}$, so opening a sourceable cell always outranks any marginal gain
-the added set could buy. Coverage is soft through the slack $e_c$, so a cell that no
-donor can source is reported rather than making the program infeasible.
+The candidate-pool expansion uses the per-candidate repair
+\eqref{eq:mip_repair} and the default-on support block \eqref{eq:mip_joint} of
+Section~\ref{sec:mip_pool_expansion}: the repair keeps as much of the real donor
+profile as the structural rules allow, and the block admits a set of binary
+support variables per zone that covers every sourceable zero-capacity cell while
+keeping the added set's deviation from the zone's target shares small. The released defaults are a per-cell carrier requirement
+$\nu_c=\lceil E_{z,k,m}/r_{\max}\rceil$, a per-zone budget
+$K_z=\sum_c\nu_c$ households, coverage weight $\lambda_0=10^{5}$ and marginal
+weight $\lambda_1=10^{-2}$; the marginal term is dominated by $\lambda_0$, so
+opening a sourceable cell always outranks any marginal gain the added set could
+buy. Coverage is soft through the slack $e_c$, so a cell that no donor can source
+is reported rather than making the program infeasible.
 
-Table~\ref{tab:pool_expansion_audit} reports the ten-zone demonstration. The
-demonstration is a mechanism check on a subset of zones under one fixed set of
-parameters; it establishes that the step can fill the sourceable zero cells with a
-small number of feasible records, not that it closes any zone's full deficit, which
-is a question for the zone fit and the validation tables. Of 123 zero-capacity
-cells, 70 of the 73 sourceable cells received a feasible candidate and all 70 were
-covered, with 14 households (18 persons) selected in total and every selection
-program solving to optimality. The weighted marginal deviation of the \emph{added
-set} ranged from 0.239 to 1.622 (median 0.406); because each zone's addition is only
-one to three persons, a single person can move a cell share substantially, so this
-figure describes the added set, not the fitted zone population. The 53 uncovered
-cells split into 40 in four categories absent from the census extract, ten in a
-padding code, and three for which no donor--shell candidate survived the household
-and rule checks---the first fifty are treated by the current parameters as absent or
-padding, and the last three identify a candidate-generation gap rather than a
-structural zero.
 
-\begin{table}[h!]
-\centering
-\caption{Ten-zone demonstration of candidate-pool expansion. \emph{Zero} is the
-number of positive-target control cells with zero attainable capacity;
-\emph{Cov.} the number covered by the selected set; \emph{HH} and \emph{Persons}
-the added records; \emph{Dev.} the weighted marginal deviation of the added set
-(lower is better). All ten selection programs returned an optimal solution. The
-53 uncovered cells are 40 in census-absent codes, ten in a padding code, and
-three with no feasible donor--shell candidate.}
-\label{tab:pool_expansion_audit}
-\small
-\begin{tabular}{@{}lrrrrr@{}}
-\toprule
-Zone & Zero & Cov. & HH & Persons & Dev. \\
-\midrule
-112011236 & 13 & 8 & 2 & 3 & 1.113 \\
-112011237 & 13 & 7 & 2 & 2 & 0.239 \\
-112011238 & 11 & 6 & 1 & 1 & 0.458 \\
-112011239 & 12 & 7 & 1 & 1 & 0.309 \\
-112011240 & 13 & 8 & 2 & 3 & 0.355 \\
-112011241 & 11 & 6 & 1 & 1 & 0.341 \\
-112011242 & 13 & 7 & 1 & 1 & 0.827 \\
-112011243 & 12 & 7 & 1 & 1 & 0.772 \\
-112021244 & 13 & 8 & 2 & 3 & 1.622 \\
-112021245 & 12 & 6 & 1 & 2 & 0.288 \\
-\midrule
-Total  & 123 & 70 & 14 & 18 & 6.326 \\
-Median & 12  & 7  & 1  & 1  & 0.406 \\
-\bottomrule
-\end{tabular}
-\end{table}
+Table~\ref{tab:pool_expansion_audit} lists every zone the audit has processed,
+two per row, with the run totals and per-zone medians beneath; the board in
+Figure~\ref{fig:expansion_board} counts the same run by control code. The audit is
+a mechanism check under one fixed set of parameters; it establishes that the step
+can make the cells a zone's slice cannot supply selectable, not that it closes any
+zone's full deficit, which is a question for the zone fit and the validation
+tables. Across the \ExpZones{} zones there were
+\ExpZeroCells{} zero-capacity cells, of which \ExpCoveredCells{} received at least
+one carrier, with a coverage set of
+\ExpAddedHouseholds{} households (\ExpAddedPersons{} persons), and every support
+solve returned an optimal solution. The released implementation also appends the
+rest of the constructed menu, so the final pool addition is 19{,}325 households
+and 67{,}475 persons (Table~\ref{tab:pool_growth}); the audit counts above
+describe the coverage set, not that larger addition. The weighted joint-marginal deviation of the
+\emph{added set} ranged from \ExpDevSumMin{} to \ExpDevSumMax{} per zone (median
+\ExpDevSumMedian); the added set ranges from 13 to 648 persons per zone (median
+167), so a single person can move a cell share substantially while the addition
+remains small relative to the zone population. This figure describes the added set,
+not the fitted zone population.
+
+\emph{Which cells expansion may fill.} A cell is in scope only when its SA2 target
+is positive and no record in the zone's pool slice carries it. A cell whose target
+is zero is a structural zero: it must stay empty, so expansion never supplies it.
+A cell with a positive target and some carriers is a partial shortfall: replication
+can reach it, so it is left to the zone fitter. Targets are SA2 while donors come
+from the SA4 microsample, so a cell can be required by a zone target even when the
+wider sample holds no carrier; expansion sources from the SA4 sample and still
+satisfies the SA2 target. A cell can therefore remain open for three reasons: no
+observed record carries the category, no rule-admissible shell can host a carrier,
+or the per-zone budget is exhausted. The first two occurred in this run; the third
+did not.
+
+\emph{Why the remaining cells stay open.} None of the \ExpUncoveredCells{}
+uncovered cells was a selection failure. Each lies in a control code that the
+extract cannot source; most are codes absent from the extract or padding codes,
+and the remainder are rare categories for which no donor--shell candidate survived
+the household and rule checks. Figure~\ref{fig:expansion_board}b gives the count for
+each code. The residual is a property of the extract, not of the expansion, and it
+is reported rather than synthesised.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{files/fig_board_expansion.pdf}
+  \caption{The expansion audit as a cell board. Panel~(a) shows the zero-capacity
+  cells of one zone's pool slice: a green square is a cell the zone's selected
+  households supply, an amber square one that no record in the slice carries, and the
+  labels name the control code of each amber square. Panel~(b) counts every cell the
+  whole run left open, by control code, over the \ExpZones{} zones; the ten codes
+  drawn account for all \ExpUncoveredCells{} of them, so what stays open is a
+  property of the extracted codes rather than of the selection. Per-zone counts for
+  each row of panel~(a) are in Table~\ref{tab:pool_expansion_audit}.}
+  \label{fig:expansion_board}
+\end{figure}
+
+\input{files/pool_expansion_table.tex}
 \FloatBarrier

@@ -268,14 +268,29 @@ class DataMappings:
         }
 
         # Mapping for education levels
+        #
+        # NOTE (2026-11-01): the ABS HEAP export transposes the two certificate
+        # rows.  Evidence: codes 1-4 in this export are IDENTICAL to the QALLP
+        # export (Postgrad 0.0392, GradDip 0.0172, Bachelor 0.1191, AdvDip
+        # 0.0716), so both tables share one coding.  Under that coding code 5
+        # is Certificate III & IV, which QALLP scores at 0.1494 and the fused
+        # microdata at 0.132 -- but this export puts only 0.0132 there and
+        # 0.1268 at code 7.  Certificate III & IV cannot be rarer than
+        # Certificate I & II, and the microdata (5 = 0.132, 7 = 0.001) matches
+        # QALLP, so the export's two certificate rows are swapped relative to
+        # the shared coding.  The labels below are therefore mapped so that the
+        # Cert III & IV count lands on code 5 and the Cert I & II count on 7,
+        # which is the coding the microdata and every fitted population use.
+        # Without this the zone target asks for 12.7% at code 7 while the pool
+        # holds 0.04% there, which is unfittable by construction.
         self.heap_map = {
             "Postgraduate Degree Level": 1,
             "Graduate Diploma and Graduate Certificate Level": 2,
             "Bachelor Degree Level": 3,
             "Advanced Diploma and Diploma Level": 4,
-            "Certificate III & IV Level": 5,
+            "Certificate III & IV Level": 7,
             "Secondary Education - Years 10 and above": 6,
-            "Certificate I & II Level": 7,
+            "Certificate I & II Level": 5,
             "Secondary Education - Years 9 and below": 8,
             "Supplementary Codes": 9,
             "Not stated": 10,
@@ -986,9 +1001,11 @@ class CensusControlTable:
             "Graduate Diploma and Graduate Certificate Level": 2,
             "Bachelor Degree Level": 3,
             "Advanced Diploma and Diploma Level": 4,
-            "Certificate III & IV Level": 5,
+            # Cert III & IV and Cert I & II transposed in the ABS HEAP export;
+            # see the note on self.heap_map above.
+            "Certificate III & IV Level": 7,
             "Secondary Education - Years 10 and above": 6,
-            "Certificate I & II Level": 7,
+            "Certificate I & II Level": 5,
             "Secondary Education - Years 9 and below": 8,
             "Supplementary Codes": 9,
             "Not stated": 10,

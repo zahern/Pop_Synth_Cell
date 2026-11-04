@@ -151,11 +151,35 @@ def main():
         else "cp_feasible_pool.csv"
     )
     pool_path = os.path.join(RESULTS_DIR, pool_name)
+    microdata = None
+    # Optional cleaned-pool cache (CP_POOL_CLEAN_CACHE=/path/pool_clean.pkl).
+    # A chunked refit otherwise pays the full pool round-trip per chunk: read a
+    # multi-hundred-MB CSV, assign infilled households, write it back out, and
+    # re-read it to clean. The cache stores the post-clean frame, which is the
+    # input every chunk actually needs, so it is keyed on the pool's mtime.
+    cache_path = os.environ.get("CP_POOL_CLEAN_CACHE", "").strip()
     if a.pool:
         print(f"Loading prebuilt CP feasible pool ({a.pool})...")
         if not os.path.isfile(a.pool):
             sys.exit(f"ERROR: --pool {a.pool} does not exist; build it with "
                      "build_feasible_pool_cp.py --coverage-tables first.")
+        # The cache records which pool it came from. A bare frame keyed only on
+        # mtime is not safe to trust: a pool can be rebuilt in place, and a pool
+        # with the same name but different contents would silently be fitted.
+        if cache_path and os.path.isfile(cache_path):
+            try:
+                cached = pd.read_pickle(cache_path)
+            except Exception:
+                cached = None
+            if (isinstance(cached, dict)
+                    and cached.get("pool") == os.path.abspath(a.pool)
+                    and cached.get("size") == os.path.getsize(a.pool)
+                    and "data" in cached):
+                print(f"  cleaned-pool cache hit: {cache_path}")
+                microdata = cached["data"]
+            elif cached is not None:
+                print(f"  cleaned-pool cache ignored (built from a different pool): "
+                      f"{cache_path}")
         # Keep the alias in sync: mip_fit.py reads cp_feasible_pool.csv, so a
         # pool fitted here must be the pool the MIP arm fits. Group infilled rows
         # into whole households first -- build_feasible_pool_cp.py writes one row
@@ -164,16 +188,17 @@ def main():
         # against an 18.6k target for 112011236). The in-line build path always
         # applied this; loading a published pool must apply it too, or the refit
         # silently uses a different pool from the one the arm was run on.
-        pool_df = assign_infilled_households(pd.read_csv(a.pool))
-        pool_df.to_csv(pool_path, index=False)
-        sidecar = os.path.splitext(a.pool)[0] + "_build19_report.json"
-        if os.path.isfile(sidecar):
-            import json
-            with open(sidecar, encoding="utf-8") as fh:
-                report = json.load(fh)
-            print("CP-pool build report (sidecar):")
-            for k, v in report.items():
-                print(f"  {k}: {v:,}" if isinstance(v, int) else f"  {k}: {v}")
+        if microdata is None:
+            pool_df = assign_infilled_households(pd.read_csv(a.pool))
+            pool_df.to_csv(pool_path, index=False)
+            sidecar = os.path.splitext(a.pool)[0] + "_build19_report.json"
+            if os.path.isfile(sidecar):
+                import json
+                with open(sidecar, encoding="utf-8") as fh:
+                    report = json.load(fh)
+                print("CP-pool build report (sidecar):")
+                for k, v in report.items():
+                    print(f"  {k}: {v:,}" if isinstance(v, int) else f"  {k}: {v}")
     else:
         print("Loading census for the CP feasible pool...")
         census = pd.read_csv(a.census)
@@ -184,9 +209,19 @@ def main():
             print(f"  {k}: {v:,}" if isinstance(v, int) else f"  {k}: {v}")
         pool.drop(columns=["_source"], errors="ignore").to_csv(pool_path, index=False)
 
-    print(f"Cleaning pool via clean_my_datagan ({pool_path})...")
-    helper = Helper()
-    microdata = helper.clean_my_datagan(pool_path)
+    if microdata is None:
+        print(f"Cleaning pool via clean_my_datagan ({pool_path})...")
+        helper = Helper()
+        microdata = helper.clean_my_datagan(pool_path)
+        if cache_path:
+            try:
+                cache_src = os.path.abspath(a.pool) if a.pool else os.path.abspath(pool_path)
+                pd.to_pickle({"pool": cache_src,
+                              "size": os.path.getsize(cache_src),
+                              "data": microdata}, cache_path)
+                print(f"  cleaned-pool cache written: {cache_path}")
+            except Exception as exc:
+                print(f"  WARNING: could not write pool cache ({exc})")
     print(f"  Pool records: {len(microdata):,}")
 
     ind_tables, hh_tables = load_control_tables()

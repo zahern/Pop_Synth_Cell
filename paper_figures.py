@@ -1084,11 +1084,10 @@ def plot_joint_pair_lines(joint_csv: str, out_path: str):
         print(f"  [WARN] Joint-pair results not found: {joint_csv}")
         return
     data = pd.read_csv(joint_csv)
-    methods = ["sa_only", "ipu_only", "cp_sa", "cp_ipu", "cp_mip"]
+    methods = ["sa_only", "ipu_only", "cp_sa", "cp_ipu"]
     labels = {
         "sa_only": "SA-Only", "ipu_only": "IPU-Only",
         "cp_sa": "CP-pool + SA", "cp_ipu": "CP-pool + IPU",
-        "cp_mip": "CP-pool + MIP",
     }
     data = data[data["method"].isin(methods)].copy()
     if data.empty:
@@ -1097,8 +1096,8 @@ def plot_joint_pair_lines(joint_csv: str, out_path: str):
     data["pair"] = data["attr_a"].str.upper() + r"$\times$" + data["attr_b"].str.upper()
     pairs = data["pair"].drop_duplicates().tolist()
     colors = dict(zip(methods, ["#2166ac", "#d95f02", "#1b9e77",
-                                "#7570b3", "#e7298a"]))
-    fig, axes = plt.subplots(1, 2, figsize=(13, 4.8), sharex=True)
+                                "#7570b3"]))
+    fig, axes = plt.subplots(1, 2, figsize=(10.8, 5.4), sharex=True)
     x = np.arange(len(pairs))
     width = 0.15
     for index, method in enumerate(methods):
@@ -1111,19 +1110,31 @@ def plot_joint_pair_lines(joint_csv: str, out_path: str):
                         label=labels[method], color=colors[method])
     axes[0].axhline(0.10, color="0.35", linestyle="--", linewidth=1,
                     label="TVD = 0.10 threshold")
-    axes[0].set_ylabel("Joint TVD (lower is better)")
-    axes[1].set_ylabel(r"$|\Delta V|$ (lower is better)")
+    axes[0].set_ylabel("Joint TVD (lower is better)", fontsize=11)
+    axes[1].set_ylabel(r"$|\Delta V|$ (lower is better)", fontsize=11)
     for ax, title in zip(axes, ["Joint marginal distance", "Association error"]):
-        ax.set_title(title)
-        ax.set_xticks(x, pairs, rotation=45, ha="right")
+        ax.set_title(title, fontsize=12)
+        # Vertical labels: at 45 degrees an 80 pt pair name projects about
+        # 57 pt horizontally, against roughly 41 pt of tick spacing in each
+        # panel, so adjacent names overlap.  Upright labels are ~11 pt wide
+        # and the bottom margin below holds their full length.
+        ax.set_xticks(x, pairs, rotation=90, ha="center", fontsize=9.0)
+        ax.tick_params(axis="y", labelsize=9.5)
         ax.grid(axis="y", alpha=0.25)
-    axes[0].legend(frameon=False, fontsize=8, loc="upper left")
+    # A shared key below the panels.  Inside the left axes it covered the
+    # dashed 0.10 threshold line (and sat under the panel title).
+    handles, labels = axes[0].get_legend_handles_labels()
+    # The key sits under the title rather than below the panels: the vertical
+    # pair names now occupy the whole bottom margin.
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.947),
+               ncol=len(handles), frameon=False, fontsize=9.0,
+               columnspacing=1.2, handletextpad=0.5)
     fig.suptitle("Joint-variable diagnostics across active strategies",
-                 fontsize=13, fontweight="bold")
-    fig.text(0.5, 0.01,
+                 fontsize=14, fontweight="bold")
+    fig.text(0.5, 0.006,
              "213-zone audit cohort; eight designed joint pairs; no GAN strategies.",
-             ha="center", fontsize=8.5, color="0.35")
-    fig.tight_layout(rect=(0, 0.04, 1, 0.94))
+             ha="center", fontsize=9, color="0.35")
+    fig.tight_layout(rect=(0, 0.27, 1, 0.865))
     fig.savefig(out_path, dpi=220, bbox_inches="tight")
     plt.close(fig)
 

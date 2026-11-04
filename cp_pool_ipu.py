@@ -334,11 +334,12 @@ def main():
             len(failed), len(zones), chunk_label, ", ".join(failed), failed_path,
         )
 
-    # Chunks must not share one summary file: cp_pool_sa.py follows the same
-    # convention, and merge_cp_sa_summaries.py already reads it.
+    # Chunks must not share one summary file.  Write into the run's own results
+    # directory: writing to the shared outputs/ root let a large-pool rerun
+    # overwrite the current-pool chunk summaries as it finished.
     summary_name = (f"cp_ipu_rssz_summary_chunk{chunk}.csv" if chunk
                     else "cp_ipu_rssz_summary.csv")
-    summary_path = os.path.join(config.OUTPUTS_DIR, summary_name)
+    summary_path = os.path.join(config.CP_IPU_RESULTS_DIR, summary_name)
     write_zone_summary(config.CP_IPU_RESULTS_DIR, summary_path, succeeded)
     summary = check_summary(summary_path)
 

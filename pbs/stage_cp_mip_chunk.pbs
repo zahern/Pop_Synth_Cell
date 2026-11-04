@@ -1,36 +1,44 @@
 #!/bin/bash -l
 #PBS -N synth_cp_mip_chunk
-#PBS -l walltime=48:00:00
-#PBS -l select=1:ncpus=4:mem=64GB
+#PBS -l walltime=12:00:00
+#PBS -l select=1:ncpus=4:mem=48GB
 #PBS -j n
-#PBS -m abe
 #PBS -r y
 
 # =============================================================================
-# Stage CP-MIP chunk — MIP fitting over a zone subset (no SA baseline).
-# Part of the 2026-10-09 parallel catch-up: the single serial job managed
-# ~11 zones in ~15 h (~80 min/zone), so the remaining zones are split into
-# parallel chunks. Each chunk writes its own cp_mip_summary_chunk<ID>.csv
-# because the shared cp_mip_summary.csv would be clobbered by concurrent jobs
-# (merge the per-chunk files once every chunk has finished).
+# Stage CP-MIP chunk -- integer-count MIP fit (cp_pool_mip.py) over a zone
+# subset of the CP feasible pool. Compute-node job: python runs HERE, never on
+# the login/head node. The submitter (submit_cp_mip.sh) only calls qsub.
 #
-# Env vars: SYNTH_POP, CHUNK_ID, ZONES (space-separated), TOL, RELAX_FACTOR,
-#           MAX_RELAX, CPU_ENV_NAME, CPU_ENV_PREFIX,
-#           MIP_TIME_LIMIT (per-zone HiGHS seconds, default 7200 — unbounded
-#             MIP solves walltime-killed 6 of 8 Oct-2026 chunks at 48h),
-#           MIP_MAX_CAND (candidate-household ceiling, default 150000 —
-#             uncapped full-pool fallbacks OOM-killed the other 2)
-#           Keep chunks to ~6 zones: MIP runs ~hours/zone on hard zones.
+# One integer program per zone chooses replication counts over the zone's whole
+# SA4 candidate slice (deduplicated into distinct household types, every
+# candidate used -- no arbitrary cap), minimising unmet control cells then the
+# 19-table deviation, with a pool-anchored joint/anchor block for out-of-sample
+# generalisation. Writes zone_<zone>_synthetic_population.csv into
+# CP_MIP_RESULTS_DIR so benchmark_margins.load_cp_mip_zones scores the full
+# paper metric suite (RSSZ, TVD, SRMSE, MAE%).
+#
+# Env: SYNTH_POP, CHUNK_ID, ZONES, POOL_OVERRIDE, RESULTS_DIR, REP_MAX,
+#      TIME_LIMIT, LAMBDA_JOINT, ANCHOR_ATTRS, JOINT_PAIRS, MAX_CANDIDATES
 # =============================================================================
 
 set -euo pipefail
-
 SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
-CHUNK_ID="${CHUNK_ID:-0}"
-TOL="${TOL:-0.05}"
-RELAX_FACTOR="${RELAX_FACTOR:-2.0}"
-MAX_RELAX="${MAX_RELAX:-5}"
 
+# ---- 19-table paper control basis (exclude the 7 held-out tables) ----------
+# Use the SAME directory every other paper arm used.  A local copy assembled
+# from data_sa2_controls is not guaranteed to be identical (sa2hind/sa2stup
+# differ between the v7 and paper19 builds), and a different control basis
+# would make the CP-MIP RSSZ incomparable with the SA/IPU rows.
+PAPER19="${PAPER19:-$SYNTH_POP/data_sa2_controls_paper19}"
+if [ ! -d "$PAPER19" ] || [ "$(ls -1 "$PAPER19"/*.csv 2>/dev/null | wc -l)" -lt 19 ]; then
+  echo "ERROR: 19-table control basis missing or incomplete: $PAPER19" >&2
+  exit 1
+fi
+export SA_CONTROL_DIR="$PAPER19"
+echo "  control basis: $SA_CONTROL_DIR ($(ls -1 "$SA_CONTROL_DIR"/*.csv 2>/dev/null | wc -l) tables)"
+
+CHUNK_ID="${CHUNK_ID:-0}"; export CHUNK_ID
 CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
 CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
 PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
@@ -39,30 +47,65 @@ source /home/ahernz/miniconda3/etc/profile.d/conda.sh
 conda activate "$CPU_ENV_NAME" || true
 export PATH="$(dirname "$PYTHON_BIN"):$PATH"
 
-POOL="$SYNTH_POP/outputs/feasible_pool.csv"
-[[ -f "$POOL" ]] || { echo "ERROR: CP pool not found: $POOL"; exit 1; }
-[[ -n "${ZONES:-}" ]] || { echo "ERROR: ZONES is empty"; exit 1; }
+POOL="${POOL_OVERRIDE:-$SYNTH_POP/outputs/feasible_pool.csv}"
+RESULTS_DIR="${RESULTS_DIR:-$SYNTH_POP/outputs/cp_mip_results}"
+mkdir -p "$RESULTS_DIR"
+# Node-local cleaned-pool cache: avoids a shared-filesystem race between chunks.
+export CP_POOL_CLEAN_CACHE="${TMPDIR:-/tmp}/pool_clean_${CHUNK_ID}.pkl"
 
-echo "================================================================"
-echo "  Stage CP-MIP chunk ${CHUNK_ID}"
-echo "  Host : $(hostname)   Job : ${PBS_JOBID:-local}   Start : $(date)"
-echo "  Zones: $ZONES"
-echo "================================================================"
+REP_MAX="${REP_MAX:-6}"
+TIME_LIMIT="${TIME_LIMIT:-120}"
+LAMBDA_JOINT="${LAMBDA_JOINT:-1.0}"
+ANCHOR_ATTRS="${ANCHOR_ATTRS:-bedrd hhcd tenlld}"
+JOINT_PAIRS="${JOINT_PAIRS:-nprd:hhcd nprd:bedrd}"
+MAX_CANDIDATES="${MAX_CANDIDATES:-}"
 
-# shellcheck disable=SC2086
-"$PYTHON_BIN" -u "$SYNTH_POP/mip_fit.py" \
-    --pool "$POOL" \
-    --tol "${TOL:-0.05}" --relax-factor "${RELAX_FACTOR:-2.0}" --max-relax "${MAX_RELAX:-5}" \
-    --hh-tol-mult "${HH_TOL_MULT:-2.0}" \
-    --abs-floor "${ABS_FLOOR:-2.0}" \
-    --time-limit "${MIP_TIME_LIMIT:-7200}" \
-    --max-candidates "${MIP_MAX_CAND:-150000}" \
-    --zones $ZONES
-
-SUM="$SYNTH_POP/outputs/cp_mip_results/cp_mip_summary.csv"
-if [[ -f "$SUM" ]]; then
-    cp "$SUM" "$SYNTH_POP/outputs/cp_mip_results/cp_mip_summary_chunk${CHUNK_ID}.csv"
-    echo "  saved chunk summary: cp_mip_summary_chunk${CHUNK_ID}.csv"
+# Sweep-selected hyperparameters: when AUTO_SETTING=1, the scorer's
+# best_setting.txt wins over the submitted defaults.  This lets the all-zone
+# jobs be queued now with a dependency on the sweep scorer; they read the
+# winning rep_max/lambda at execution time, not at qsub time.
+AUTO_SETTING="${AUTO_SETTING:-0}"
+SWEEP_BEST="${SWEEP_BEST:-}"
+if [ "$AUTO_SETTING" = "1" ]; then
+  if [ -f "$SWEEP_BEST" ]; then
+    # shellcheck disable=SC1090
+    source "$SWEEP_BEST"
+    echo "  auto setting <- $SWEEP_BEST : rep_max=$REP_MAX lambda_joint=$LAMBDA_JOINT"
+  else
+    echo "  [warn] AUTO_SETTING=1 but $SWEEP_BEST missing; using submitted defaults"
+  fi
 fi
 
+if [ -n "${ZONES_FILE:-}" ]; then
+  [[ -f "$ZONES_FILE" ]] || { echo "ERROR: ZONES_FILE missing: $ZONES_FILE" >&2; exit 1; }
+  ZONES="$(tr '\n' ' ' < "$ZONES_FILE")"
+fi
+[[ -n "${ZONES:-}" ]] || { echo "ERROR: ZONES empty for chunk ${CHUNK_ID}"; exit 1; }
+echo "================================================================"
+echo "  CP-MIP chunk ${CHUNK_ID}  ($(echo "$ZONES" | wc -w) zones)"
+echo "  host=$(hostname)  job=${PBS_JOBID:-local}  start=$(date)"
+echo "  pool=$POOL  rep_max=$REP_MAX  time_limit=$TIME_LIMIT  lambda_joint=$LAMBDA_JOINT"
+echo "================================================================"
+
+MAXC_ARG=()
+[[ -n "$MAX_CANDIDATES" ]] && MAXC_ARG=(--max-candidates "$MAX_CANDIDATES")
+
+cd "$SYNTH_POP"
+
+# shellcheck disable=SC2086
+"$PYTHON_BIN" -u "$SYNTH_POP/cp_pool_mip.py" \
+    --pool "$POOL" --zones $ZONES \
+    --rep-max "$REP_MAX" --time-limit "$TIME_LIMIT" \
+    --lambda-joint "$LAMBDA_JOINT" \
+    --anchor-attrs $ANCHOR_ATTRS --joint-pairs $JOINT_PAIRS \
+    ${MAXC_ARG[@]+"${MAXC_ARG[@]}"} \
+    --results-dir "$RESULTS_DIR"
+
+MARK_DIR="$RESULTS_DIR/.done"; mkdir -p "$MARK_DIR"
+{
+  echo "chunk_id=${CHUNK_ID}"
+  echo "zones=$(echo "$ZONES" | wc -w)"
+  echo "finished=$(date -Is)"
+  echo "summary=$RESULTS_DIR/cp_pool_rssz_summary_chunk${CHUNK_ID}.csv"
+} > "$MARK_DIR/cp_mip_chunk${CHUNK_ID}.done"
 echo "  CHUNK ${CHUNK_ID} COMPLETE : $(date)"

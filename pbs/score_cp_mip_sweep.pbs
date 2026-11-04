@@ -1,0 +1,32 @@
+#!/bin/bash -l
+#PBS -N cp_mip_sweep_score
+#PBS -l walltime=04:00:00
+#PBS -l select=1:ncpus=2:mem=32GB
+#PBS -j oe
+
+# Score the CP-MIP sweep on the held-out control tables and write the winning
+# rep_max/lambda for the all-zone run.  Compute node only.
+set -euo pipefail
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+export USE_HPC=1
+source /home/ahernz/miniconda3/etc/profile.d/conda.sh
+conda activate "$CPU_ENV_NAME" || true
+export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+
+SWEEP_ROOT="${SWEEP_ROOT:?missing SWEEP_ROOT}"
+ZONES_FILE="${ZONES_FILE:?missing ZONES_FILE}"
+OUT="${OUT:-$SWEEP_ROOT/sweep_summary.csv}"
+BEST="${BEST:-$SWEEP_ROOT/best_setting.txt}"
+
+echo "host=$(hostname) job=${PBS_JOBID:-local} start=$(date)"
+echo "sweep_root=$SWEEP_ROOT"
+echo "zones_file=$ZONES_FILE"
+"$PYTHON_BIN" -u "$SYNTH_POP/score_cp_mip_sweep.py" \
+  --sweep-root "$SWEEP_ROOT" \
+  --zones-file "$ZONES_FILE" \
+  --out "$OUT" \
+  --best "$BEST"
+echo "done $(date)"

@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.ipynb_checkpoints/
+
+# HPC / PBS
+*.o[0-9]*
+*.e[0-9]*
+*.log
+pbs_logs/
+outputs/
+
+# LaTeX
+main_edit3.pdf
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+
+# Large fitted populations and intermediate pools
+feasible_pool*.csv
+*_hhts.csv
+*.pkl
+*.pickle
+
+# Keep the small released summaries and the control tables
+!released_summaries/*.csv
+!data_sa2_controls*/*.csv
+*.glsdefs

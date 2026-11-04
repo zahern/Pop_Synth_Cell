@@ -1,99 +1,161 @@
-% Figure 2: visual representation of MIP candidate-pool expansion.
-\begin{figure}[htbp]
+% Figure: candidate-pool expansion as four worked panels.
+% Deliberately equation-free: the program itself is Eq. (13) in the body, and
+% the panels show what each step does to one zone rather than restating it.
+\begin{figure}[t]
 \centering
 \begin{tikzpicture}[
   >=stealth,
-  every node/.style={font=\small},
-  panel/.style={draw, rounded corners=2pt, inner sep=5pt},
-  title/.style={font=\scriptsize\bfseries, align=center},
-  cell/.style={draw, minimum width=0.62cm, minimum height=0.42cm,
-               inner sep=0pt, align=center, font=\scriptsize},
-  have/.style={cell, fill=blue!16, draw=blue!55!black},
-  zero/.style={cell, fill=red!20, draw=red!75!black, line width=0.9pt},
-  add/.style={cell, fill=green!22, draw=green!60!black, line width=0.8pt},
-  person/.style={circle, draw=black!65, fill=white, minimum size=0.28cm,
-                 inner sep=0pt},
-  shell/.style={draw=black!65, rounded corners=1pt, minimum width=1.35cm,
-                minimum height=0.9cm, inner sep=2pt},
-  arrow/.style={->, line width=0.9pt, draw=black!65}
+  panel/.style={draw=black!35, rounded corners=2pt, line width=0.5pt},
+  title/.style={font=\scriptsize\bfseries, anchor=west},
+  cell/.style={draw=black!45, minimum width=0.34cm, minimum height=0.30cm,
+               inner sep=0pt, line width=0.35pt},
+  have/.style={cell, fill=blue!14, draw=blue!45!black},
+  short/.style={cell, fill=orange!28, draw=orange!70!black},
+  zero/.style={cell, fill=red!26, draw=red!70!black, line width=0.7pt},
+  hit/.style={cell, fill=green!45!black, draw=green!50!black},
+  rowlab/.style={font=\tiny, anchor=east, inner sep=1pt},
+  collab/.style={font=\tiny, anchor=south, inner sep=1pt},
+  tag/.style={font=\tiny, anchor=west, inner sep=0pt},
+  note/.style={font=\tiny, align=left, text=black!75, inner sep=0pt},
+  flow/.style={->, draw=black!55, line width=0.6pt},
+  donor/.style={circle, draw=black!65, fill=white, minimum size=0.17cm,
+                inner sep=0pt},
+  shell/.style={draw=black!65, rounded corners=1pt, minimum width=0.42cm,
+                minimum height=0.26cm, inner sep=0pt},
+  xbox/.style={draw=black!55, minimum width=0.30cm, minimum height=0.26cm,
+               inner sep=0pt, font=\tiny},
+  small/.style={cell, minimum width=0.20cm, minimum height=0.20cm},
 ]
 
-% 1. A zone-specific zero-capacity cell.
-\node[panel, minimum width=3.0cm, minimum height=3.0cm] (audit) at (0,0) {};
-\node[title] at (0,1.18) {1 \quad zone slice};
-\node[font=\tiny] at (-0.78,0.72) {target};
-\node[font=\tiny] at (-0.78,0.24) {pool};
-\foreach \x/\target/\cap in {-0.20/8/3,0.48/4/0,1.16/6/2} {
-  \node[have] at (\x,0.72) {\target};
-  \ifnum\cap=0
-    \node[zero] at (\x,0.24) {\cap};
-  \else
-    \node[have] at (\x,0.24) {\cap};
-  \fi
+% ==================================================== 1  audit (top left)
+\draw[panel] (0,1.12) rectangle (7.20,3.90);
+\node[title] at (0.20,3.62) {1\quad audit the zone's slice};
+
+\foreach \name/\y in {SEXP/3.00, MSTP/2.60, VEHRD/2.20} {
+  \node[rowlab] at (1.90,\y) {\name};
 }
-\node[font=\tiny, text=red!75!black] at (0.50,-0.75) {missing cell};
-
-% 2. Feasible donor-shell household candidates.
-\node[panel, minimum width=3.0cm, minimum height=3.0cm] (candidates) at (4.0,0) {};
-\node[title] at (4.0,1.18) {2 \quad feasible candidates};
-\node[shell] (h1) at (3.55,0.32) {};
-\node[person] at (3.25,0.52) {};
-\node[person] at (3.25,0.16) {};
-\node[add] at (3.98,0.32) {2};
-\node[font=\tiny] at (3.55,-0.42) {$j_1$};
-\node[shell] (h2) at (4.45,-0.24) {};
-\node[person] at (4.15,-0.04) {};
-\node[person] at (4.15,-0.40) {};
-\node[add] at (4.88,-0.24) {2,3};
-\node[font=\tiny] at (4.45,-0.86) {$j_2$};
-
-% 3. MIP chooses a covering set.
-\node[panel, minimum width=3.0cm, minimum height=3.0cm] (select) at (8.0,0) {};
-\node[title] at (8.0,1.18) {3 \quad joint selection};
-\node[font=\scriptsize] at (7.25,0.56) {$j_1$};
-\node[font=\scriptsize] at (7.25,-0.12) {$j_2$};
-\node[draw=green!60!black, fill=green!15, minimum width=0.42cm,
-      minimum height=0.42cm, inner sep=0pt] at (7.78,0.56) {$1$};
-\node[draw=green!60!black, fill=green!15, minimum width=0.42cm,
-      minimum height=0.42cm, inner sep=0pt] at (7.78,-0.12) {$1$};
-\node[font=\tiny] at (8.65,0.56) {$x_{j_1}$};
-\node[font=\tiny] at (8.65,-0.12) {$x_{j_2}$};
-\draw[thick] (7.20,-0.55) -- (8.78,-0.55);
-\node[font=\tiny, align=center] at (8.0,-0.78) {cover cells\\within budget};
-
-% 4. Original pool plus appended households; the zero cell is now supported.
-\node[panel, minimum width=3.0cm, minimum height=3.0cm] (expanded) at (12.0,0) {};
-\node[title] at (12.0,1.18) {4 \quad expanded pool};
-\node[font=\tiny] at (11.72,0.82) {target};
-\node[font=\tiny] at (11.72,0.38) {pool};
-\foreach \x/\target/\cap in {11.98/8/3,12.48/4/1,12.98/6/2} {
-  \node[have, minimum width=0.42cm, minimum height=0.32cm] at (\x,0.82) {\target};
-  \ifnum\cap=1
-    \node[add, minimum width=0.42cm, minimum height=0.32cm] at (\x,0.38) {\cap};
-  \else
-    \node[have, minimum width=0.42cm, minimum height=0.32cm] at (\x,0.38) {\cap};
-  \fi
+% supplied everywhere except one short and one empty cell
+\foreach \x in {2.05,2.42,2.79,3.16,3.53,3.90} {
+  \node[have] at (\x,3.00) {};
+  \node[have] at (\x,2.20) {};
 }
-\node[font=\tiny, text=green!50!black] at (12.48,0.04) {zero cell covered};
-\node[shell, draw=green!60!black, fill=green!12, minimum width=1.05cm,
-      minimum height=0.28cm, inner sep=0pt] at (11.72,-0.48) {};
-\node[add, minimum width=0.42cm, minimum height=0.28cm] at (12.30,-0.48) {};
-\node[shell, draw=green!60!black, fill=green!12, minimum width=1.05cm,
-      minimum height=0.28cm, inner sep=0pt] at (12.42,-0.88) {};
-\node[add, minimum width=0.42cm, minimum height=0.28cm] at (13.00,-0.88) {};
+\foreach \x/\state in {2.05/have,2.42/short,2.79/have,3.16/zero,
+                       3.53/have,3.90/have} {
+  \node[\state] at (\x,2.60) {};
+}
 
-\draw[arrow] (audit.east) -- (candidates.west);
-\draw[arrow] (candidates.east) -- (select.west);
-\draw[arrow] (select.east) -- (expanded.west);
+% three-state legend, written as outcomes rather than as inequalities
+\node[small, fill=blue!14, draw=blue!45!black] at (0.40,1.80) {};
+\node[tag] at (0.58,1.80) {supplied: enough records};
+\node[small, fill=orange!28, draw=orange!70!black] at (0.40,1.55) {};
+\node[tag] at (0.58,1.55) {short: replication can still reach it};
+\node[small, fill=red!26, draw=red!70!black] at (0.40,1.30) {};
+\node[tag] at (0.58,1.30) {zero: nothing in the slice carries it;
+  expansion's job};
+
+% ============================================== 2  candidates (top right)
+\draw[panel] (7.50,1.12) rectangle (15.60,3.90);
+\node[title] at (7.68,3.62) {2\quad build candidate households};
+
+\node[font=\tiny, anchor=west, inner sep=1pt] at (7.78,3.26) {donor};
+\node[font=\tiny, anchor=west, inner sep=1pt] at (8.62,3.26) {shell};
+\node[font=\tiny, anchor=west, inner sep=1pt] at (9.34,3.26) {candidate};
+
+\foreach \y/\cov/\lab in {2.95/2/{$j_1$}, 2.60/1/{$j_2$}, 2.25/2/{$j_3$}} {
+  \node[rowlab] at (7.98,\y) {\lab};
+  \node[donor] at (8.15,\y) {};
+  \node[font=\tiny] at (8.42,\y) {$+$};
+  \node[shell] at (8.72,\y) {};
+  \node[donor, minimum size=0.13cm] at (8.72,\y) {};
+  \draw[flow, line width=0.5pt] (8.94,\y) -- (9.20,\y);
+  \foreach \x in {9.34,9.56,9.78} {
+    \node[cell, minimum width=0.20cm, minimum height=0.20cm] at (\x,\y) {};
+  }
+  \foreach \k in {1,...,\cov} {
+    \node[hit, minimum width=0.20cm, minimum height=0.20cm]
+      at ({9.34+(\k-1)*0.22},\y) {};
+  }
+  \node[tag] at (10.02,\y) {covers \cov};
+}
+
+\node[note, anchor=west] at (8.05,1.82)
+  {one donor profile in one local household slot};
+\node[note, anchor=west] at (8.05,1.52)
+  {a candidate may cover several cells};
+
+% ================================ 3  one selection for the zone (middle)
+\draw[panel] (0,-1.95) rectangle (15.60,0.95);
+\node[title] at (0.20,0.70) {3\quad select one set for the whole zone};
+
+\foreach \x/\lab in {2.62/{$j_1$},3.04/{$j_2$},3.46/{$j_3$}} {
+  \node[collab] at (\x,0.30) {\lab};
+}
+\foreach \name/\y in {\texttt{mstp:3}/0.00, \texttt{vehrd:6}/-0.37,
+                     \texttt{tend:6}/-0.74, \texttt{strd:9}/-1.11} {
+  \node[rowlab] at (2.38,\y) {\name};
+}
+\foreach \x in {2.62,3.04,3.46} {
+  \foreach \y in {0.00,-0.37,-0.74,-1.11} {
+    \node[cell] at (\x,\y) {};
+  }
+}
+% j1 covers mstp, vehrd and strd; j3 covers mstp and tend; j2 is left out
+\foreach \x/\y in {2.62/0.00,3.46/0.00,2.62/-0.37,3.46/-0.74,2.62/-1.11} {
+  \node[hit] at (\x,\y) {};
+}
+
+\node[rowlab] at (2.38,-1.55) {$y_j$};
+\node[xbox, fill=green!16] at (2.62,-1.55) {1};
+\node[xbox] at (3.04,-1.55) {0};
+\node[xbox, fill=green!16] at (3.46,-1.55) {1};
+\draw[flow, line width=0.5pt] (3.66,-1.55) -- (3.95,-1.55);
+\node[tag] at (4.02,-1.55) {take or leave each candidate};
+
+% what the program enforces, in words
+\node[small, fill=white, draw=black!45] at (6.30,0.00) {};
+\node[tag] at (6.48,0.00) {one column per candidate};
+\node[small, fill=white, draw=black!45] at (6.30,-0.47) {};
+\node[tag] at (6.48,-0.47) {every zero cell covered};
+\node[small, fill=white, draw=black!45] at (6.30,-0.94) {};
+\node[tag] at (6.48,-0.94) {one candidate per real dwelling};
+\node[small, fill=green!45!black, draw=green!50!black] at (11.45,0.00) {};
+\node[tag] at (11.63,0.00) {added shares stay near the zone's};
+\node[small, fill=red!26, draw=red!70!black] at (11.45,-0.47) {};
+\node[tag] at (11.63,-0.47) {report a cell nobody can source};
+\node[small] at (11.45,-0.94) {};
+\node[tag] at (11.63,-0.94) {all control tables at once};
+\node[note, anchor=west] at (11.45,-1.55)
+  {the selection itself is Eq.~(13)};
+
+% ============================================ 4  append, then fit (strip)
+\draw[panel] (0,-2.95) rectangle (15.60,-2.20);
+\node[title] at (0.20,-2.42) {4\quad append, then fit};
+
+\node[cell, fill=green!16, minimum width=0.26cm, minimum height=0.26cm]
+  at (0.50,-2.80) {};
+\node[note, anchor=west] at (0.68,-2.80) {selected set};
+\draw[flow] (2.35,-2.80) -- (2.75,-2.80);
+\node[cell, fill=blue!14, minimum width=0.26cm, minimum height=0.26cm]
+  at (2.95,-2.80) {};
+\node[note, anchor=west] at (3.13,-2.80) {the zone's pool};
+\draw[flow] (5.15,-2.80) -- (5.55,-2.80);
+\node[note, anchor=west] at (5.65,-2.80)
+  {the fitter decides how often each record is reused};
+
+
+% ================================================================== arrows
+\draw[flow] (7.23,2.62) -- (7.48,2.62);
+\draw[flow] (11.55,1.32) -- (11.55,0.98);
+\draw[flow] (7.80,-1.98) -- (7.80,-2.18);
 
 \end{tikzpicture}
-\caption{Visual distinction between global CP construction and zone-specific MIP pool
-expansion. The zone slice begins with a red zero-capacity cell: its target is positive,
-but no current pool record can supply it. Feasible donor--shell households are represented
-as candidate cards, with the colored tags showing the cells each household covers. The
-joint MIP marks the candidates selected together under coverage and budget constraints.
-The final panel shows the original pool rows retained and the selected households appended
-in green. This enlarges candidate support before SA, IPU, or MIP fitting; it does not
-construct the final zone population.}
+\caption{One zone through pool expansion. (1)~The zone's slice is audited cell by
+cell; only a cell with no carrier at all is a pool defect, because a short cell can
+still be reached by replication. (2)~A donor member profile is written into a slot of
+a local shell household, giving one candidate that may cover several cells at once.
+(3)~One binary choice per candidate, made for every control table together, must cover
+the zero cells, keep the added shares near the zone's own, and report rather than
+invent a cell that no candidate can source. (4)~The selected set is appended to the
+zone's pool; how often a record is reused is decided by the fitter, not here.}
 \label{fig:mip-expansion-process}
 \end{figure}

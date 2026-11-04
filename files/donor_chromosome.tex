@@ -1,0 +1,149 @@
+% Figure: donor attributes enter a shell slot, then the family/household
+% counters are recomputed and the whole block is validated.
+\begin{figure}[t]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  >=stealth,
+  attr/.style={draw=black!45, minimum width=0.70cm, minimum height=0.42cm,
+               inner sep=0pt, font=\scriptsize},
+  donor/.style={attr, fill=orange!22, draw=orange!70!black},
+  shell/.style={attr, fill=blue!13, draw=blue!55!black},
+  repaired/.style={attr, fill=green!22, draw=green!55!black},
+  target/.style={attr, fill=orange!50, draw=orange!85!black, line width=0.9pt},
+  lab/.style={font=\tiny, anchor=east, inner sep=1pt},
+  top/.style={font=\tiny, rotate=90, anchor=west, inner sep=1pt},
+  note/.style={font=\tiny, align=left, inner sep=0pt},
+  head/.style={font=\scriptsize\bfseries, anchor=west, inner sep=0pt},
+  box/.style={draw=black!45, rounded corners=2pt, inner sep=2pt,
+              font=\tiny, align=center},
+  flow/.style={->, draw=black!60, line width=0.6pt},
+  flowd/.style={->, draw=orange!75!black, line width=0.7pt},
+  flows/.style={->, draw=blue!60!black, line width=0.7pt},
+]
+
+% ======================================================== (a) attribute vector
+\node[head] at (0.00,4.70) {(a) donor attributes into a shell slot};
+
+% donor strip
+\node[lab] at (0.10,3.40) {donor person};
+\foreach \name/\x/\style in {%
+  AGEP/1.90/donor, SEXP/2.65/donor, MSTP/3.40/donor,
+  HEAP/4.15/donor, QALFP/4.90/target, RLHP/5.65/donor} {
+  \node[\style] at (\x,3.40) {};
+  \node[top] at (\x-0.06,3.64) {\name};
+}
+\node[note, anchor=west] at (6.20,3.40) {target cell:\\ \texttt{qalfp:12}};
+
+% shell strip
+\node[lab] at (0.10,2.20) {shell household};
+\foreach \name/\x in {NPRD/1.90, HIND/2.85, VEHRD/3.80,
+                      STRD/4.75, RLHP/5.70} {
+  \node[shell, minimum width=0.95cm, font=\tiny] at (\x,2.20) {\name};
+}
+
+
+% new person strip
+\node[lab] at (0.10,1.00) {new person};
+\foreach \name/\x/\style in {%
+  AGEP/1.90/repaired, SEXP/2.65/donor, MSTP/3.40/repaired,
+  HEAP/4.15/donor, QALFP/4.90/target, RLHP/5.65/shell} {
+  \node[\style] at (\x,1.00) {};
+  \node[top] at (\x-0.06,1.24) {\name};
+}
+% Below the slot it describes, clear of the repaired-profile arrow.
+\node[note, anchor=west] at (6.15,0.57)
+  {\texttt{qalfp=12, rlhp=3}};
+
+% flows
+\draw[flowd] (1.25,3.18) -- (1.25,1.24)
+  node[pos=0.25, left, font=\tiny, align=right] {donor\\values};
+\draw[flows] (6.35,1.98) -- (6.35,1.24)
+  node[pos=0.25, right, font=\tiny] {fixed context};
+
+% repair box
+\node[box, text width=2.35cm] (repair) at (7.90,2.60)
+  {repair: nearest\\ feasible profile;\\ cuts $\mathcal{C}$};
+\draw[flow] (6.40,2.60) -- (repair.west);
+% Enter the slot from its right-hand edge, below the "fixed context" arrow,
+% so the elbow does not cut through that label.
+\draw[flow] (repair.south) |- (6.00,1.10);
+
+% legend
+\node[donor, minimum width=0.18cm, minimum height=0.18cm] at (0.20,0.12) {};
+\node[note, anchor=west] at (0.32,0.12) {donor};
+\node[shell, minimum width=0.18cm, minimum height=0.18cm] at (1.35,0.12) {};
+\node[note, anchor=west] at (1.47,0.12) {shell/fixed};
+\node[repaired, minimum width=0.18cm, minimum height=0.18cm] at (2.90,0.12) {};
+\node[note, anchor=west] at (3.02,0.12) {repaired by the rules};
+
+% ======================================================== (b) family
+\node[head] at (9.95,4.70) {(b) family and household reconciliation};
+
+\node[draw=black!45, rounded corners=3pt, fill=blue!4,
+      minimum width=5.25cm, minimum height=2.55cm] (hh) at (12.50,2.65) {};
+\node[note, anchor=north] at (12.50,3.78)
+  {household fields fixed; counters recomputed};
+
+\node[circle, draw=black!55, fill=blue!12, minimum size=0.62cm,
+      font=\tiny] (a1) at (10.70,3.15) {1};
+\node[circle, draw=black!55, fill=blue!12, minimum size=0.62cm,
+      font=\tiny] (a2) at (11.65,3.15) {2};
+\node[circle, draw=orange!80!black, fill=orange!45, minimum size=0.62cm,
+      font=\tiny, line width=0.9pt] (ch) at (12.60,3.15) {3};
+\node[circle, draw=black!55, fill=blue!12, minimum size=0.62cm,
+      font=\tiny] (o) at (13.55,3.15) {...};
+
+\node[note, anchor=north] at (10.70,2.80) {\texttt{RLHP=1}};
+\node[note, anchor=north] at (11.65,2.80) {\texttt{RLHP=2}};
+\node[note, anchor=north] at (12.60,2.80) {\texttt{RLHP=3}\\new};
+\node[note, anchor=north] at (13.55,2.80) {other};
+
+\node[box] (cprf) at (10.70,1.95) {\texttt{CPRF}};
+\node[box] (cacf) at (11.55,1.95) {\texttt{CACF}};
+\node[box] (nprd) at (12.40,1.95) {\texttt{NPRD}};
+\node[box] (fam)  at (13.35,1.95) {\texttt{families}};
+\draw[flow] (cprf.north) -- ++(0,0.22);
+\draw[flow] (cacf.north) -- ++(0,0.22);
+\draw[flow] (nprd.north) -- ++(0,0.22);
+\draw[flow] (fam.north) -- ++(0,0.22);
+
+% validation
+\node[diamond, draw=black!55, fill=blue!5, aspect=2.0, inner sep=1pt,
+      font=\tiny, align=center] (val) at (12.50,0.72)
+  {11 shared\\rules};
+\draw[flow] (12.50,1.55) -- (val.north);
+% The outcomes are boxes, so both arrows terminate at a node.
+\node[box, draw=red!65!black, fill=red!8, text=red!65!black,
+      minimum width=0.80cm] (discard) at (10.60,0.72) {discard};
+\node[box, draw=green!55!black, fill=green!9, text=green!45!black,
+      minimum width=0.70cm] (emit) at (14.30,0.72) {emit};
+\draw[flow, draw=green!55!black] (val.east) -- (emit.west)
+  node[midway, above=1.5pt, font=\tiny, text=green!45!black] {pass};
+\draw[flow, draw=red!65!black] (val.west) -- (discard.east)
+  node[midway, above=1.5pt, font=\tiny, text=red!65!black] {fail};
+
+\node[note, anchor=west] at (9.95,0.05)
+  {the rule check is on the whole household, after the counters are recomputed};
+
+\end{tikzpicture}%
+}
+\caption{Donor attributes are mixed into a shell slot, not copied as a person
+row. \textbf{(a)} The donor's person-level vector (orange) is the target; the
+shell household (blue) fixes the dwelling fields and supplies the
+\texttt{RLHP} slot. The donor's \texttt{RLHP} is a preference: the solver uses a
+shell slot with that role when one exists, otherwise the shell slot defines the
+new person's role. The completion program returns the closest rule-feasible
+profile to the donor vector, with the target cell (\texttt{qalfp:12}) as a hard
+row; attributes that the rules force away from the donor value are shown in
+green. The solved profile is written into the shell's slot, so the new person
+carries the donor's attributes where the rules allow and the shell's household
+context everywhere else. \textbf{(b)} The family and household counters
+(\texttt{CPRF}, \texttt{CACF}, \texttt{NPRD}, \texttt{families}) are recomputed
+from the solved member vectors, and the whole household is checked against the
+eleven shared rules of Appendix~\ref{sec:ref}. A candidate that fails is
+discarded, not patched; a candidate that passes is emitted with a fresh
+identifier and the target SA2 tag. Profiles outside the person-level model fall
+back to a whole-household copy; the figure shows the person-level repair path.}
+\label{fig:donor_chromosome}
+\end{figure}

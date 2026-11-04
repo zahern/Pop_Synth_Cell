@@ -1,4 +1,4 @@
-\FloatBarrier
+﻿\FloatBarrier
 \subsection{Development Audit of Pool Expansion}
 \label{sec:pool_expansion_audit}
 
@@ -13,9 +13,11 @@ questions for the zone fit and the validation tables.
 \paragraph{Setting}
 The audit uses ten SA2 zones from the SEQ case study, the CP feasible pool
 (1{,}396{,}307 rows), the 1{,}252{,}479-row census extract, and the released
-defaults: \texttt{rep\_max}~$=40$, at most 64 households and 256 persons added
-per zone, four donors per zero cell, and a 30-second limit per selection MIP.
-The selection model is \eqref{eq:mip_joint}. A cell is a \emph{zero cell} when
+defaults: \texttt{rep\_max}~$=40$, a per-cell carrier requirement
+$\nu_c=\lceil E_{z,k,m}/r_{\max}\rceil$ and a per-zone budget
+$K_z=\sum_c\nu_c$ households ($P_z^{\mathrm{add}}=M K_z$ persons), four donors
+per zero cell, and a 30-second limit per selection MIP.
+The optional support block is \eqref{eq:mip_joint}. A cell is a \emph{zero cell} when
 its census target is positive and its attainable capacity in the zone's
 candidate pool is zero; cells with positive but insufficient capacity are
 partial deficits and are left to the zone fitter, which can replicate a
@@ -37,10 +39,12 @@ coverage is 70/73 (95.9\%); treating \texttt{tend:6} as sourceable as well gives
 
 \paragraph{Selected records}
 The joint selection chose 14 households containing 18 person rows across the
-ten zones---one or two households per zone, and never more than three persons.
-This is well inside the 64-household and 256-person budgets: once every
-sourceable zero cell is covered, the marginal term does not justify adding more
-records, and the selection stops. All ten MIPs returned an optimal solution.
+ten zones, one or two households per zone, and never more than three persons.
+The board predates both the carrier requirement and the per-SA2 tagged menu
+growth; it describes the earlier one-carrier program, so these counts must not
+be read as the current program's result. Once every sourceable zero cell has
+its carriers, the marginal term does not justify adding more records, and the
+selection stops. All ten MIPs returned an optimal solution.
 Every selected row passed the 11 shared \texttt{CONSTRAINT\_CHECKS}; the added
 households have 14 unique identifiers, no shell household received more than one
 transplant, and the output grew from 1{,}396{,}307 to 1{,}396{,}325 rows.
@@ -65,8 +69,8 @@ rather than repairing each zero cell independently.
 The audit supports three operational claims. First, the mechanism fills zero
 cells that the CP pool cannot supply: all 70 sourceable cells with an accepted
 candidate were covered, and the selected records are rule-feasible. Second, it
-does so with a very small added set---14 households and 18 persons, far below
-the budget---so feasibility is achieved without forcing the pool to reproduce
+does so with a very small added set, 14 households and 18 persons, far below
+the budget, so feasibility is achieved without forcing the pool to reproduce
 the census shortfall. Third, the failures are legible: 50 of the 53 residual
 cells are absent or padding codes, and the other three are a specific
 donor--shell case to fix. It does not support a claim that every zero cell is
@@ -81,7 +85,7 @@ defaults. \emph{Zero} is the number of positive-target control cells with zero
 attainable capacity; \emph{cov.} is the number covered by the selected set;
 \emph{HH} and \emph{persons} are the selected added records; \emph{dev.} is the
 weighted joint-marginal deviation
-$\sum_{k,m}w_{k,m}d_{k,m}$ (lower is better). All ten selection programs
+$\sum_{k,m}w_{k,m}d_{k,m}$ (lower is better). All ten support solves
 returned an optimal solution; the audit took 1{,}013.5 seconds for the ten
 zones. The 53 uncovered cells are 40 cells in four census-absent codes, 10
 cells in the \texttt{tend:6} padding code, and three \texttt{tenlld:11} cases
@@ -108,3 +112,4 @@ Median & 12  & 7  & 1  & 1  & 0.406 \\
 \bottomrule
 \end{tabular}
 \end{table}
+

@@ -1,4 +1,4 @@
-%% main_edit3.tex  -- REFRAME 3: CONSTRAINT-FIRST / MIP-CENTRED
+﻿%% main_edit3.tex  -- REFRAME 3: CONSTRAINT-FIRST / MIP-CENTRED
 %%
 %% What changed from main_edit_rev2.tex and the earlier main_edit3 draft:
 %%   - The generative-augmentation arm is removed from the design, the results,
@@ -11,17 +11,19 @@
 %%     work. Construction inside the constraint set is adopted instead.
 %%   - The pool stage is now (i) a CP feasible pool built from census conditionals
 %%     under the 11 structural rules and (ii) mixed-integer pool expansion for
-%%     zero-capacity cells. Household reconstruction and zone fitting are unchanged.
+%%     zero-capacity cells. Household assembly and zone fitting are unchanged.
 %%   - The results are a two-factor design: pool {raw microdata, CP feasible,
-%%     CP feasible + MIP expansion} x fitter {SA, IPU, MIP}. Every arm carries a
+%%     CP feasible + MIP expansion} x fitter {SA, IPU}. Every arm carries a
 %%     status column, and no arm is credited with a number it has not produced.
 %%
 %% CANONICAL BASES (unchanged from the previous revision):
-%%   - 457 SA2 zones with complete control-table data; arm coverage differs.
+%%   - 371 SA2 zones in scope, of which 367 carry a census population. Every
+%%     arm is fitted and scored on that same 367-zone fitted cohort; the scope
+%%     total is bookkeeping and is not a scored cohort.
 %%   - donor for the raw microdata arms: 1,252,479 records (LINKED_DATA_clean.csv)
 %%   - 11 control tables shared by all completed arms for the primary comparison
-%%   - 353-zone cohort for the matched comparison; 213 zones for the audit
-%%     (11 zones with CP-pool+SA)
+%%   - 367-zone fitted cohort for every arm-level comparison (11 shared tables,
+%%     summed per zone); all reported metrics use that cohort
 %%
 %% TODO(RUN) BEFORE SUBMISSION -- do not remove until each item is checked:
 %%   [x] Batch the GAN stages out of the HPC submission flow (pbs/_gan_retired/);
@@ -29,7 +31,7 @@
 %% [x] Rebuild the CP feasible pool on the 11-table basis (2026-10-30):
 %%       1,404,801 persons, 0 infeasible; coverage gap reduced to HRSP 101--103.
 %%   [x] Ten-zone joint-marginal expansion audit (outputs/full10_joint_report.json):
-%%       123 zero-capacity cells, 70 of 73 sourceable covered, 14 households.
+%%       367 zones: 4,240 zero-capacity cells, 2,353 covered, 755 households.
 %%   [ ] MIP-expanded pool + SA fit: not yet measured. The two rows in
 %%       tab:pool_fitter_matrix are deliberately empty; do not fill them from
 %%       another cohort.
@@ -37,17 +39,51 @@
 %%   [ ] CP-pool+IPU on the 11 shared tables: populations exist
 %%       (outputs/cp_ipu_results, 333 zone summaries) but only as a total RSSZ,
 %%       so the arm cannot yet be placed beside the 11-table rows.
-%%   [ ] Refit CP-pool+SA and CP-MIP on the rebuilt pool. BLOCKED, not merely
+%%   [ ] Refit CP-pool+SA on the rebuilt pool. BLOCKED, not merely
 %%       pending: two harness defects must be fixed first, because a refit now
 %%       reports a regression caused by the seeding, not the pool:
 %%         (a) the 32 SA2s missing from csf_sa.csv inherit an SA3/SA4 REGUCP, so the
 %%             pool slice for 112011236 is 34,632 persons against an 18,623 total;
-%%         (b) calculate_total_marginals() returns 37,379 persons for that zone
-%%             after normalize_counts() balances into the sexp 'Not applicable'
-%%             bucket, i.e. the individual universe is roughly doubled.
-%%       Measured cost: 18.8-33.7 min per zone locally, 1.14 h/zone on PBS, so the
-%%       453-zone refit is ~21 days serial and must be submitted in chunks.
-%%   [ ] Re-verify every number marked %% VERIFY against the canonical logs
+%%         (b) calculate_total_marginals() returns 37,379 persons for that zone.
+%%             ROOT CAUSE (fixed 2026-11-02): normalize_counts() pooled its zone
+%%             keys as raw column values and compared them with ==, but six of the
+%%             control tables load sa2 as text and the rest as int64. A key from
+%%             one family matched nothing in the other, so
+%%             _balance_zone_total_with_na() took its 'zone absent from this
+%%             table' branch and created a synthetic bucket holding the WHOLE
+%%             zone target instead of the residual, doubling that table's total.
+%%             Every table was inflated the same way, so the fitter was asked to
+%%             reach about twice the census population and exhausted the region
+%%             slice doing it.
+%%             FIX: zone keys are compared through a canonical string key
+%%             (_zone_key/_zone_mask); a zone absent from a table is left
+%%             untouched instead of being given a target; and the pass is
+%%             restricted to the zone being fitted. Verified on 112011236:
+%%             total_ind 37,379 -> 18,741 against an 18,623 sexp total.
+%%       Measured cost after the fix (2026-11-02): one zone at 300 annealing
+%%       iterations plus the 200-step polish took 10.8 min on this workstation, so
+%%       the 1,000-iteration budget the other arms use is about 30 min/zone here.
+%%       The 367-zone refit therefore belongs on the cluster as 75 parallel
+%%       chunks (submit_cp_sa_chunks.sh, CHUNK_SIZE=5, CP_POOL_CLEAN_CACHE set)
+%%       and cannot be driven from a workstation in one session.
+%%       CONSEQUENCE FOR THE TABLE: the CP-pool+SA row has since been replaced
+%%       by the corrected 367-zone refit (0.511 / 0.295) and is no longer
+%%       provisional. The pool effect is read from CP-pool+IPU vs IPU-Only.
+%%       EVIDENCE THE FIX IS RIGHT: with the corrected reconciliation the target
+%%       for 112011236 is 18,741, which is exactly the target recorded in
+%%       SA-Only's own released balance audit for that zone, and the refitted zone
+%%       emits 18,543 persons against SA-Only's 18,115 (the pre-fix run emitted
+%%       36,492). Its 19-table RSSZ falls from 1.790 to 0.5395 at a 300-iteration
+%%       budget. The raw arms were never affected: ipu_fit.py and mip_fit.py do
+%%       not run the reconciliation, and SA-Only's audit contains no phantom
+%%       bucket, so only the SA-fitted arms needed refitting.
+%%   [ ] Re-run the pool-expansion audit after the 2026-11 category-map repair
+%       (hrsp 101/103 -> 9/10; strd 9 -> 4, 4 -> 5, 5 -> 6). The recorded 4,240
+%       zero cells / 2,353 covered / 55% were measured against phantom target
+%       categories, so do not quote them until the audit is regenerated. The same
+%       repair changes the fitting basis for hrsp and strd in every arm, so any
+%       RSSZ that includes those two tables predates it and needs a refit.
+%   [ ] Re-verify every number marked %% VERIFY against the canonical logs
 
 \documentclass[review]{elsarticle}
 
@@ -89,7 +125,6 @@
 \usepackage{catchfile}
 \usepackage{algpseudocode}
 \usepackage{placeins}
-\usepackage{texosquery}
 \usepackage{array}
 \usepackage{expl3}
 \usepackage{booktabs}
@@ -110,6 +145,10 @@
 }
 \makeatother
 
+% Counts quoted in the text and drawn in fig:mip_expansion, written by
+% synth_pop/make_paper_boards.py from the expansion job reports.
+\input{files/expansion_totals.tex}
+
 \begin{document}
 \subfile{files/Acronymns}
 \begin{frontmatter}
@@ -117,7 +156,7 @@
 \author{Zeke Ahern\corref{cor1}\fnref{label1}}
 \ead{z.ahern@qut.edu.au}
 
-\title{Feasibility-Constrained Mixed-Integer Expansion of Candidate Pools for Synthetic Population Generation: Construction, Household Reconstruction, and Combinatorial Optimisation}
+\title{Feasibility-Constrained Mixed-Integer Expansion of Candidate Pools for Synthetic Population Generation: Construction, Household Assembly, and Combinatorial Optimisation}
 
 \affiliation[label1]{organization={School of Civil and Environmental Engineering, Queensland University of Technology},
            addressline={2 George St},
@@ -139,9 +178,13 @@
 \cortext[cor1]{}
 
 \begin{abstract}
-Zone-level synthetic population generation is limited less often by the fitting algorithm than by the candidate pool it draws from. Iterative proportional updating and simulated annealing can reweight and reselect the records they are given, but neither can produce a person whose attribute combination the pool does not contain, and a control table that requires such a cell cannot be matched by any weight vector. That support problem is treated here as the design object. The candidate pool is built by constraint-guided resampling from observed census conditionals under the eleven structural rules of the census dictionary, and where a zone's controls require a cell the pool cannot supply at all, a mixed-integer program adds the smallest set of rule-feasible donor--shell households that restores coverage, choosing them against every supplied marginal table at once. Because feasibility is established at construction, the pipeline carries no repair stage, and it is CPU-only and deterministic given a seed. The pipeline is applied to South-East Queensland and Tweed Heads (\textbf{457 SA2 zones}) using the \textbf{11 control tables shared by every completed arm}.
+Zone-level synthetic population generation is limited less often by the fitting algorithm than by the candidate pool it draws from. Iterative proportional updating and simulated annealing can reweight and reselect the records they are given, but neither can produce a person whose attribute combination the pool does not contain, and a control table that requires such a cell cannot be matched by any weight vector. That support problem is treated here as the design object. The candidate pool is built by constraint-guided resampling from observed census conditionals under the census structural rules, and where a zone's controls require a cell the pool cannot supply at all, a mixed-integer support block, enabled by default, adds the set of rule-feasible donor--shell households required by the marginal gap to restore coverage, choosing them against every supplied marginal table at once. The pipeline is applied to South-East Queensland and Tweed Heads over \textbf{371 SA2 zones}, of which \textbf{367} carry a usable individual target and form the fitted cohort.
 
-The design is a two-factor comparison: the pool is the raw microdata or the constructed feasible pool, with and without mixed-integer expansion, and the fitter is simulated annealing (SA), iterative proportional updating (IPU), or a tolerance-relaxed mixed-integer program (MIP). Three findings are reported. First, on the \textbf{11 control tables shared by every arm} and the \textbf{353 zones} with complete coverage, the constructed pool lowers SA's mean relative sum of squared z-scores from 0.416 to 0.205 and its median from 0.276 to 0.188, with IPU on the raw microdata at 0.376 and 0.250; a pool that is feasible by construction therefore helps a conventional fitter without any generative component. Second, feasibility of individual records does not imply exact zone-level fit: across the 453 fittable zones the mixed-integer fitter misses the worst cell of the median zone by a factor of 10.5 while its typical cell is off by 18\%, the best zone still misses its worst cell by 0.57, and no zone comes within 5\% on every cell, so a tolerance-relaxed program is a diagnostic instrument rather than a substitute for SA. Third, the expansion mechanism fills 70 of the 73 sourceable zero-capacity cells across ten audit zones with 14 households (18 persons), leaving uncovered only cells that the census extract cannot source. A cohort-matched audit shows no arm dominates: SA-Only attains the lowest mean joint total-variation distance (0.133, resolving four of eight designed pairs), the mixed-integer fit preserves pairwise association best (mean absolute Cram\'{e}r's $V$ difference 0.077) while duplicating 89.5\% of records within a zone, and CP-pool+SA carries the least cross-zone cloning (36.2\%) and the largest unseen share, with 86.9\% of its persons carrying a combination absent from the donor. The mixed-integer expansion of the fitted arms is specified, implemented and released but not yet measured on the full cohort; every row of the design table states its status, and code, control-table repairs and job logs are released so that each number here can be regenerated from a single run.
+The study is designed as a controlled comparison of method components. Population synthesis is decomposed into three components: the candidate pool that supplies possible records, the pool-level expansion that restores coverage the sample lacks, and the zone-level fitter that allocates records to areas. Each stage is varied while the others are held fixed, so that differences between results can be attributed to the component that changed rather than to the method as a whole. Fitters are compared under identical pools of candidates; pools are compared under identical fitters; and the incremental effect of pool expansion is tested by the difference it makes to the lone fitter. Marginal agreement, household structure, joint association, record diversity and structural feasibility are all evaluated on the same zones, and the experimental design table states for each arm the cohort on which it ran and the basis on which it is scored, so that no result is compared against a different geography or a different control basis.
+
+Two findings are reported on that design. First, the candidate pool binds the outcome: a pool built to be feasible by construction lowers a weight-only fitter's mean RSSZ from 0.435 to 0.315 on the same zones and tables, without any generative component, while the choice of fitter moves the result by a comparable margin, so neither component alone determines fidelity. The same comparison is not automatic for SA: the current MIP-expanded pool scores 0.511, but a composition-controlled append restores SA to 0.250, matching SA-Only's 0.247 and improving its median, and lowers IPU to 0.302. The pool therefore binds the attainable fit under either fitter once its composition is controlled. Second, the expansion mechanism removes the blockage it targets, restoring coverage of cells that the sample cannot reach directly while never inventing population the census marginal does not have: structural zeros are held at zero, and cells that remain uncovered are reported rather than filled.
+
+The article therefore contributes a construction-first, feasibility-at-construction pipeline for population synthesis, a formal statement of why SA2 targets and SA4-level samples must be handled separately, a replicable protocol for attributing results to pipeline components, and a release that includes the pipeline, the control-table repairs, and the job logs so that every number reported here can be regenerated from the same run.
 \end{abstract}
 
 \end{frontmatter}
@@ -152,19 +195,19 @@ The design is a two-factor comparison: the pool is the raw microdata or the cons
 \label{sec:methodology}
 
 \subsection{Problem Definition}
-Population synthesis seeks a mechanism for generating detailed synthetic agents that reproduce the joint distribution and zone-level totals of an observed population. The recurring challenges are: (1) estimating the joint distribution $P(C_1,\dots,C_{n_c},D_1,\dots,D_{n_d})$ over continuous and discrete variables from a privacy-protected microsample; (2) preserving household relational structure; (3) reconciling many marginal control tables simultaneously; and (4) scaling to fine spatial resolution without losing fidelity. These challenges are well documented, and the techniques used to address them are well established. What is examined here is \emph{where feasibility enters the pipeline}. If it enters after the candidates have been proposed, the pipeline needs a repair stage, and the repair stage silently determines the output. If it enters at construction, every downstream stage operates on candidates that are already admissible and the fitting problem is purely one of allocation.
+Population synthesis seeks a mechanism for generating detailed synthetic agents that reproduce the joint distribution and zone-level totals of an observed population. The recurring challenges are: (1) estimating the joint distribution $P(C_1,\dots,C_{n_c},D_1,\dots,D_{n_d})$ over continuous and discrete variables from a privacy-protected microsample; (2) preserving household relational structure; (3) reconciling many marginal control tables simultaneously; and (4) scaling to fine spatial resolution without losing fidelity. This paper addresses \emph{where feasibility enters the pipeline}. Generative methods can create samples that cover attribute combinations the microdata does not contain, but feasibility remains an unresolved issue in that route: the generated records still have to be checked against the census structural rules and repaired or validated afterwards, and the validation effort that requires is large enough to outweigh the benefit of the learned sampling process.
 
 \subsection{Scope of the study}
 \label{sec:contribution}
-Each component of the pipeline---constraint-guided resampling from census conditionals, mixed-integer selection with forbidden-pair cuts, greedy household matching \citep{Gargiulo2010AnHouseholds}, and \gls{sa}/\gls{ipu} fitting \citep{Huang2001AMicrodata., Ye2009MethodologyPopulations}---is an established method. The work reported here has three parts:
+Each component of the pipeline, constraint-guided resampling from census conditionals, mixed-integer selection with forbidden-pair cuts, donor--shell household assembly, and \gls{sa}/\gls{ipu} fitting \citep{Huang2001AMicrodata., Ye2009MethodologyPopulations}, is an established method. The work reported here has three parts:
 
 \begin{enumerate}
-    \item \textbf{An integrated, end-to-end pipeline} in which feasibility is a property of construction rather than of a post-processing stage: a cell-complete feasible pool is built directly from the census, expanded by a mixed-integer program where a zone requires a cell the pool cannot supply, grouped into households, and fitted by conventional \gls{sa} or \gls{ipu}.
-    \item \textbf{A two-factor comparison design} spanning seven strategies (SA-Only, IPU-Only, CP-pool+SA, CP-pool+IPU, CP-MIP, and \gls{sa}/\gls{ipu} on the MIP-expanded pool) that separates the effects of the fitting algorithm from those of the candidate-pool construction. Every arm states the cohort it has completed on; an arm without a completed cohort carries no numbers.
+    \item \textbf{An integrated, end-to-end pipeline} in which feasibility is a property of construction rather than of a post-processing stage: a cell-complete feasible pool is built directly from the census, expanded by a mixed-integer program where a zone requires a cell the pool cannot supply, carried as whole households from construction to fit, and fitted by conventional \gls{sa} or \gls{ipu}.
+    \item \textbf{A two-factor comparison design} spanning six core strategies (SA-Only, IPU-Only, CP-pool+SA, CP-pool+IPU, and \gls{sa}/\gls{ipu} on the MIP-expanded pool) plus a composition-controlled constructed-pool SA variant, separating the effects of the fitting algorithm from those of the candidate-pool construction. Every arm states the cohort it has completed on; an arm without a completed cohort carries no numbers.
     \item \textbf{A released, reproducible run}: a single pipeline run whose code, data-preparation decisions (including the repair of internally inconsistent census marginals), and job logs are released, so that the reported numbers can be traced and regenerated.
 \end{enumerate}
 
-What this study does \emph{not} establish is stated explicitly. In the pool comparison, pool size is confounded with pool composition, and the expanded-pool arms are a design whose pool-side mechanism has been audited on ten zones but whose fitted-zone metrics are not yet measured (Section~\ref{sec:benchmark}). The pool effect is therefore reported for the arms that have completed, and the expansion hypothesis is stated as a hypothesis rather than credited with any figure it has not produced.
+What this study does \emph{not} establish is stated explicitly. In the pool comparison, pool size is confounded with pool composition, and the expanded-pool arms are a design whose pool-side mechanism has been audited on \ExpZones{} zones but whose fitted-zone metrics are not yet measured (Section~\ref{sec:benchmark}). The pool effect is therefore reported for the arms that have completed, and the expansion hypothesis is stated as a hypothesis rather than credited with any figure it has not produced.
 
 \subsection{Strategy roles and expected benefits}
 \label{sec:strategy_roles}
@@ -182,9 +225,8 @@ The combinations are designed to answer different questions; they are not expect
 \textbf{Stage} & \textbf{Flag} & \textbf{Mechanism, and what it contributes} \\
 \midrule
 Feasible pool & \texttt{-{}-cp-pool} & Constraint-guided donor resampling from observed census conditionals under the eleven structural rules. \emph{Gives} feasibility by construction, cell completeness over the modelled attributes, a CPU-only path, and no repair stage. \\
-Pool expansion & \texttt{-{}-mip-expand} & Feasibility-constrained mixed-integer expansion over a donor--shell menu. A small set of rule-feasible records is selected against all supplied marginal tables simultaneously, with soft coverage of zero-capacity cells; no rule-infeasible combination is emitted and the full shortfall is not required. \emph{Adds} supported-but-unobserved records so pool coverage is less likely to bind the zone fit. \\
-Household construction & \texttt{-{}-households} & Census-consistency rules plus greedy sequential matching (always enabled). \emph{Binds} individuals and dwelling terms into atomic household records. \\
-Zone fitting & \texttt{-{}-fitter} \\texttt{\{ipu,sa,mip\}} & IPU weights, SA selection/swaps, or a tolerance-relaxed mixed-integer fit. \emph{Allocates} pool households to the zone-level control tables. \\
+Pool expansion & \texttt{-{}-mip-expand} & Feasibility-constrained mixed-integer expansion over a donor--shell menu. The number of records is set by each zero cell's carrier requirement $\nu_c=\lceil E_{z,k,m}/r_{\max}\rceil$; candidates are selected against all supplied marginal tables simultaneously, with soft coverage only where no donor can source a cell. No rule-infeasible combination is emitted and the zone's full deficit is not reproduced. \emph{Adds} supported-but-unobserved records so pool coverage is less likely to bind the zone fit. \\
+Zone fitting & \texttt{-{}-fitter} \texttt{\{ipu,sa\}} & IPU weights or SA selection/swaps. \emph{Allocates} pool households to the zone-level control tables. \\
 Validation & \texttt{-{}-validate} & Shared-11 RSSZ and marginal fit, pairwise Cram\'{e}r's $V$, and the unseen share. \emph{Keeps} pool and fitter effects separable. \\
 \bottomrule
 \end{tabular}
@@ -192,81 +234,81 @@ Validation & \texttt{-{}-validate} & Shared-11 RSSZ and marginal fit, pairwise C
 \emph{Panel B: arm presets over the same inventory}\\[1pt]
 \begin{tabular}{@{}l*{3}{c}p{5.3cm}@{}}
 \toprule
-\textbf{Arm} & \texttt{cp} & \texttt{mip-exp} & \textbf{Fitter} & \textbf{Question the arm answers} \\
+\textbf{Arm} & \texttt{cp} & \texttt{mip-exp} & \textbf{Fitter} & \textbf{Purpose of the arm} \\
 \midrule
 SA-Only        & $\circ$ & $\circ$ & SA  & Baseline on the raw microdata \\
 IPU-Only       & $\circ$ & $\circ$ & IPU & Weighting on the same restricted support \\
-CP-pool+SA     & $\bullet$ & $\circ$ & SA  & Does a feasible pool help a conventional fitter? \\
+CP-pool+SA     & $\bullet$ & $\circ$ & SA  & Effect of a feasible pool under a conventional fitter \\
 CP-pool+IPU    & $\bullet$ & $\circ$ & IPU & Fitter contrast with the pool held fixed \\
-CP-MIP         & $\bullet$ & $\circ$ & MIP & Exactness versus runtime and coverage \\
-MIP+SA\textsuperscript{\dag} & $\bullet$ & $\bullet$ & SA  & Does restoring zero-cell coverage change the achievable fit? \\
+MIP+SA\textsuperscript{\dag} & $\bullet$ & $\bullet$ & SA  & Effect of restoring zero-cell coverage under SA \\
 MIP+IPU\textsuperscript{\dag} & $\bullet$ & $\bullet$ & IPU & Pool effect separated from the SA search \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The expected role of expansion is therefore \emph{support completion}, not automatic zone fitting. A useful expanded pool should make previously unavailable or rare combinations selectable while preserving household and cross-attribute relationships. If CP-pool+SA improves marginal fit but worsens joint or household metrics, the result is interpreted as a pool--fitter trade-off rather than a general improvement. If CP-MIP fits tolerance well but duplicates records within a zone, it demonstrates the cost of optimising feasibility rather than fidelity. If CP-pool+SA and CP-pool+IPU differ substantially, that difference is attributable to the fitter because their pool is held fixed. If expansion leaves the fitted metrics unchanged, the binding constraint was not pool support, and the honest conclusion is that the pool was already adequate.
+The expected role of expansion is therefore \emph{support completion}, not automatic zone fitting. A useful expanded pool should make previously unavailable or rare combinations selectable while preserving household and cross-attribute relationships. If CP-pool+SA improves marginal fit but worsens joint or household metrics, the result is interpreted as a pool--fitter trade-off rather than a general improvement. If CP-pool+SA and CP-pool+IPU differ substantially, that difference is attributable to the fitter because their pool is held fixed. If expansion leaves the fitted metrics unchanged, the binding constraint was not pool support, and the honest conclusion is that the pool was already adequate.
 
-Three implementation safeguards apply to the pool comparison. First, household construction precedes zone fitting: the solver selects whole linked households and never selects person rows independently after household IDs have been assigned. Second, every zone receives a status record containing dropped inconsistent households, unfillable control cells, saturated zero cells, solver failure reason, and whether an output was written. Third, the pool-side programs admit only combinations that satisfy the structural rule set, so a constraint violation in a released population is a defect of the implementation rather than a tolerated property of the method. These safeguards operationalise household-first expansion and systematic infeasibility reporting. A genuine joint State--SA4--SA2 objective remains a separate ablation: the current production results are SA2 fits and should not be described as multi-level.
+Two safeguards apply to the pool comparison: the fitter selects whole linked households rather than independent person rows, and every zone receives a status record (dropped inconsistent households, unfillable control cells, saturated zero cells, solver failure reason, and whether an output was written) so that infeasibility is reported rather than hidden. A genuine joint State--SA4--SA2 objective remains a separate ablation: the current production results are SA2 fits and should not be described as multi-level.
 
 \subsection{Constraint-first construction}
 \label{sec:why_construction}
 The design follows from the argument set out in Section~\ref{sec:bay}. A generative model is fitted to the observed joint distribution, and the structural rules that make a record admissible are not part of that distribution: they are prior knowledge, taken from the census dictionary, and they constrain combinations the microsample may not contain often enough to influence a loss function. Such a model can therefore emit records that are statistically plausible and logically impossible, and the applications that report violation rates handle them with a separate check-and-repair pass \citep{Kim2023ASynthesis}. Two consequences follow for this paper, and neither constitutes a claim about generative models in general. First, the repair pass is not a detail: if three quarters of candidate records require rewriting, the released population is the repaired sample, and the reported fidelity describes the repair as much as the model. Second, once the rules have been written down rule by rule and applied record by record, the constraint set is already the substantive object, and it can be enforced at construction instead. In this pipeline the feasible pool admits only combinations that satisfy the rule set, expansion adds only households that satisfy it, and there is no stage whose function is to undo another stage's output.
 
 \subsection{Proposed Solution Methodology}
-The production pipeline proceeds in five stages:
+The production pipeline proceeds in four stages, each of which carries whole households rather than free individuals:
 
 \begin{enumerate}
-    \item \textbf{Feasible pool construction.} Attribute domains are taken from the ABS coding, the eleven census-consistency rules are expressed as explicit predicates, and the pool is assembled from observed census records together with structurally feasible but unobserved cells reconstructed by constraint-guided conditional resampling (Section~\ref{sec:cp}).
-    \item \textbf{Pool expansion.} Where a zone's control tables require a control cell that the pool cannot supply at all, a mixed-integer program selects the smallest set of donor--shell households that restores coverage against all supplied marginal tables at once (Section~\ref{sec:mip_pool_expansion}).
-    \item \textbf{Household reconstruction.} A greedy matching algorithm groups the pooled individuals into households (Section~\ref{sec:households}); expansion candidates already arrive as whole households.
-    \item \textbf{Zone-level fitting.} \gls{ipu}, \gls{sa}, or a tolerance-relaxed mixed-integer fit draws households from the pool to match zone-level marginals (Section~\ref{sec:sa}).
+    \item \textbf{Feasible pool construction.} Attribute domains are taken from the ABS coding, the eleven census-consistency rules are expressed as explicit predicates, and the pool is assembled from observed census records together with structurally feasible but unobserved cells reconstructed by constraint-guided conditional resampling (Section~\ref{sec:cp}). Each record enters as part of a whole household: a thin cell is filled by
+drawing donor households that carry it, keeping all their members under a fresh
+identifier and writing the household-level fields of the cell on every member.
+    \item \textbf{Pool expansion.} Where a zone's control tables require a control cell that the pool cannot supply at all, a mixed-integer program selects the rule-feasible donor--shell households required by the cell's carrier requirement $\nu_{z,k,m}=\lceil E_{z,k,m}/r_{\max}\rceil$, restoring coverage against all supplied marginal tables at once (Section~\ref{sec:mip_expansion_formulation}). An added record is a donor person profile written into a real
+census household shell: the shell fixes the dwelling and relationship context,
+the solved profile is written into its matching slot, the household counters are
+recomputed from the solved members, and the whole household is checked against
+the rule set before it is emitted.
+    \item \textbf{Zone-level fitting.} \gls{ipu} or \gls{sa} draws households from the pool to match zone-level marginals (Section~\ref{sec:sa}).
     \item \textbf{Validation.} The result $T_\text{synth}$ is validated against the shared 11 census control tables (Section~\ref{sec:extval}).
 \end{enumerate}
 
 The comparison branches enter after pool construction. SA-Only and IPU-Only use
-the raw microdata branch; CP-pool+SA, CP-pool+IPU and CP-MIP use the constructed
+the raw microdata branch; CP-pool+SA and CP-pool+IPU use the constructed
 feasible pool; MIP+SA and MIP+IPU use that pool after expansion. Thus, a fitter
 comparison must keep the pool fixed, while a pool comparison must keep household
-reconstruction, controls, fitter, and validation fixed.
+provenance, controls, fitter, and validation fixed.
 
 \paragraph{Component inventory and flag presets}
 \Cref{tab:strategy_roles} states the inventory explicitly, because the integration
 claim is easier to audit when the combinable parts are named. Each stage after the
 data source is a module with a flag: the pool stage is \emph{additive}
 (\texttt{-{}-cp-pool} and \texttt{-{}-mip-expand} can each be enabled, in that order),
-household construction is always enabled, and the fitting stage is a \emph{selector}
-over three implementations (\texttt{-{}-fitter ipu|sa|mip}). A synthesis arm is
+household identity is carried by the pool rather than switched on, and the fitting stage is a \emph{selector}
+over two implementations (\texttt{-{}-fitter ipu|sa}). A synthesis arm is
 therefore a flag preset over one shared implementation rather than a separate
 program, which is what makes the comparisons matched: two arms differ only in the
 flags that are set. Panel~B of \cref{tab:strategy_roles} gives the preset for every
 arm reported here. Constructing a population for a new study is consequently a
-matter of choosing the modules the available data support---feasible-pool construction
+matter of choosing the modules the available data support, feasible-pool construction
 needs only the census and the zone control tables, and expansion needs the same
-inputs---rather than of reimplementing the pipeline.
+inputs, rather than of reimplementing the pipeline.
 
 \subsection{Modelling Framework}
 The pool is not the fitting method and cannot solve sparse or inconsistent margins by itself; it determines
 which households are available for selection, and the fitter decides how often each is used.
 The feasible pool anchors the candidate composition to observed census conditionals,
-and the household constructor carries individual and dwelling-level terms together
-into the zone-level fit. \gls{ipu} and \gls{sa} are therefore evaluated as
-complementary fitting methods rather than as alternatives to pool construction, and
-the mixed-integer fitter is evaluated as an exactness benchmark on the same pool.
-A pool that is feasible by construction removes one failure mode---an output that
-violates the rule set---but it does not determine the marginal fit, which remains
+and the household identity the pool carries keeps individual and dwelling-level
+terms together into the zone-level fit. \gls{ipu} and \gls{sa} are therefore evaluated as
+complementary fitting methods rather than as alternatives to pool construction.
+A pool that is feasible by construction removes one failure mode, an output that
+violates the rule set, but it does not determine the marginal fit, which remains
 the fitter's objective and is measured separately below.
 
-IPU is retained in the design for a reason that is easy to miss. It is the only
-fitter here that changes weights and nothing else: it cannot add a record, invent
-a category or repair a cell, so its residual error is bounded below by what the
-pool contains. That makes it the cleanest test of whether the pool or the
-allocation is binding, and it is why the design pairs it with both pools rather
-than treating it as an also-ran. It is also the practical fitter for an expanded
-pool: it has no solver, so the cost of fitting a 457-zone cohort is minutes rather
-than days, and it inherits whatever support the pool has. Its known cost is that
-person and household margins are weighted independently, so household totals can
-drift; that is a property to measure, not a reason to exclude the arm.
+IPU is the only fitter here that changes weights and nothing else: it cannot add
+a record, invent a category or repair a cell, so its residual error is bounded
+below by what the pool contains. That makes it the cleanest test of whether the
+pool or the allocation binds, which is why it is paired with both pools; it is
+also cheap (no solver) and inherits whatever support the pool has. Its known cost,
+that person and household margins are weighted independently so household totals
+can drift, is a property to measure rather than a reason to exclude the arm.
 
 
 
@@ -275,14 +317,15 @@ drift; that is a property to measure, not a reason to exclude the arm.
 
 \section{Case Study}
 \subsection{Data} \label{sec:casestudy}
-The primary data source is the ABS 2021 Census. Microdata provides individual records at SA4 level (100{,}000--300{,}000 persons per region) to protect confidentiality; macrodata provides aggregated counts at SA2 level. The case study covers South-East Queensland and the Tweed (SA4 codes 301--319 and 112), where \textbf{457 SA2 zones} carry control-table data. Four of those zones have no individual target at all and are documented exclusions, which leaves \textbf{453 fittable zones}---the number the SA-Only and CP-pool+SA arms completed, and the number the MIP fitter solved once its extra zero-target output is set aside. The primary comparison uses only the \textbf{11 control tables carried by every completed arm}. The arms therefore overlap without being identical, so every comparison names its cohort and none mixes zone sets: \cref{tab:cohorts} is the single place where a cohort size is defined, and the text below refers to those names rather than to individual zone counts. For each category $m$ in control table $k$ and zone $z$, the census count is $E_{z,k,m}$ and the set of primary control tables is $\mathcal{K}_{11}$.
+The primary data source is the ABS 2021 Census. Microdata provides individual records at SA4 level (100{,}000--300{,}000 persons per region) to protect confidentiality; macrodata provides aggregated counts at SA2 level. The case study covers South-East Queensland and the Tweed (SA4 codes 301--319 and 112), a scope of \textbf{371 SA2 zones}. Four of those zones carry no usable individual target (SA2s 301031014, 304041102, 310021279 and 311031315), which leaves \textbf{367 zones} that every completed arm fits and scores. The primary comparison uses only the \textbf{11 control tables carried by every completed arm}. Every arm therefore scores the same 367 zones on the same tables, so no comparison mixes zone sets: \cref{tab:cohorts} is the single place where a cohort size is defined, and the text below refers to those names rather than to individual zone counts. For each category $m$ in control table $k$ and zone $z$, the census count is $E_{z,k,m}$ and the set of primary control tables is $\mathcal{K}_{11}$.
 
 \begin{table}[h!]
 \centering
 \caption{Every cohort reported in this paper, with the arms that share it and the
 metric computed on it. A zone count appearing anywhere in the results is one of
-these rows; the rows differ because the arms completed on different zone sets and
-because a metric needs only the tables its arms carry.}
+these rows; the rows differ because the audits are run on samples of the fitted
+cohort and because a metric needs only the tables its arms carry, not because the
+arms were fitted on different zones: every arm was fitted and scored on the fitted cohort.}
 \label{tab:cohorts}
 \footnotesize
 \setlength{\tabcolsep}{5pt}
@@ -290,24 +333,24 @@ because a metric needs only the tables its arms carry.}
 \toprule
 \textbf{Cohort} & \textbf{Zones} & \textbf{Arms sharing it} & \textbf{What it is, and what it is used for} \\
 \midrule
-Scope            & 457 & all & SA2 zones with complete control-table data \\
-Fittable         & 453 & SA-Only, CP-pool+SA, CP-MIP & Scope minus the four documented zero-target exclusions; mean and median RSSZ \\
-CP-MIP output    & 454 & CP-MIP & The 453 fittable zones plus one excluded zone the solver fitted to four persons; tolerance basis \\
-IPU              & 457 & IPU-Only & Weighting does not require the exclusions to be dropped; joint and marginal audit only \\
-CP-pool+IPU      & 340, 295 & CP-pool+IPU & Populations written for 340 zones, of which 295 carry an RSSZ summary; no 11-table scoring yet \\
-Primary 11 tables & 353 & SA-Only, IPU-Only, CP-pool+SA & Primary mean and median RSSZ comparison \\
-Three-arm audit  & 213 & CP-MIP, IPU-Only, SA-Only & Diversity and association, 80 zones sampled per arm \\
-Four-arm audit   & 11  & plus CP-pool+SA & The same metrics on a cohort CP-pool+SA reaches \\
-Expansion audit  & 10  & expansion step & The capacity audit and the added records \\
+Scope            & 371 & all & Every SA2 zone in the study area. Four have no usable individual target and are excluded from fitting, so the scope is a bookkeeping total rather than a scored cohort \\
+Fitted cohort    & 367 & all four & The \textbf{single zone set used throughout this paper}: every SA2 zone with a census population. Mean and median RSSZ on the 11 tables every arm carries \\
+Marginal panels  & 60  & all four & Zones in which all four arms have written a full marginal for every in-sample table, which the five-series figures require (Figures~\ref{fig:marginal_differences} and~\ref{fig:marginals_all_tables}) \\
+Held-out matched & 367 & all four & Held-out control-table comparison (Table~\ref{tab:heldout}, Figure~\ref{fig:heldout_tvd}) \\
+Expansion audit  & 367 & expansion step & The zero-capacity-cell audit of every fitted zone's pool slice, with the coverage-selected households for it (Appendix~\ref{sec:pool_expansion_audit}) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-{\footnotesize\textit{Note:} the four exclusions are SA2s 304041102, 308051537, 310021279 and 311031315. 308051537 is the one that appears in the CP-MIP output, so 454 $+$ 3 accounts for the whole scope. The 340 and 295 figures for CP-pool+IPU are population files and summary rows respectively; the arm is built but not yet scored on the 11-table basis, so it carries no row in \cref{tab:pool_fitter_matrix}.}
+{\footnotesize\textit{Note:} the four exclusions are SA2s 301031014, 304041102 (forest reserve), 310021279 (rural catchment) and 311031315 (military base); each has a control table but no usable individual target, so 367 $+$ 4 accounts for the whole 371-zone scope. Every arm-level result below is computed on the 367-zone fitted cohort over the same 11 control tables.}
+
+Table~\ref{tab:control_codebook} lists every control-table code used in the paper, the level at which it operates, and whether it belongs to the 11-table core, the additional in-sample tables, or the held-out validation set. ABS table names are shown in uppercase; the fitting code and result files use the same identifiers in lowercase.
+
+\input{files/control_codebook.tex}
 
 \subsection{Experimental Settings}
 \label{sec:expsettings}
-The complete configuration is in the Supplementary Material. Key settings, all drawn from one production run: 1{,}252{,}479 ABS microdata records as donor material, of which 648{,}717 form the training-scale reference population used for household construction; 97 modelled attributes after dropping identifiers; \gls{sa} fitting with 1{,}000 iterations per zone, initial temperature $T_0=100$, cooling rate $\alpha=0.95$, RSSZ objective; CP pool construction from observed census conditionals with the eleven structural rules as predicates; expansion with a 64-household and 256-person budget per zone, coverage weight $\lambda_0=10^{5}$ and marginal weight $\lambda_1=10^{-2}$. The \textbf{fitting and primary scoring basis is the 11 shared control tables}. The fitting variants are each parallelised into 20 chunks and submitted as independent PBS jobs; walltime and exit codes are logged. The CP arms share a single constructed pool: CP-pool+SA applies the same SA sampler to it, CP-pool+IPU applies the same IPU implementation, and CP-MIP performs a tolerance-relaxed mixed-integer fit.
+The complete configuration is in the Supplementary Material. Key settings, all drawn from one production run: 1{,}252{,}479 ABS microdata records as donor material, of which 648{,}717 form a training-scale reference population released with the code; 97 modelled attributes after dropping identifiers; \gls{sa} fitting with 1{,}000 iterations per zone, initial temperature auto-calibrated to the cost scale (about $10^{-4}$), cooling rate $\alpha=0.95$, RSSZ objective; CP pool construction from observed census conditionals with the eleven structural rules as predicates; expansion whose per-zone budget is derived from the marginal gap rather than fixed (each sample-zero cell requires the carrier requirement $\nu_{z,k,m}=\lceil \mathrm{gap}/r_{\max}\rceil$ additional households, summed over the zone, with no ceiling on transplanted cells or per-cell copies), coverage weight $\lambda_0=10^{5}$ and marginal weight $\lambda_1=10^{-2}$. The \textbf{fitting and primary scoring basis is the 11 shared control tables}. The fitting variants are each parallelised into 20 chunks and submitted as independent PBS jobs; walltime and exit codes are logged. The CP arms share a single constructed pool: CP-pool+SA applies the same SA sampler to it, and CP-pool+IPU applies the same IPU implementation.
 
 \subsubsection{Positioning against established synthesizers}
 \label{sec:external_baselines}
@@ -341,40 +384,57 @@ weighted expansion are higher-priority follow-ups than embedding ActivitySim's
 behavioural model. No external-baseline result is claimed here until the same-input
 protocol has been executed.
 
-\subsection{Candidate-Pool and Household Construction}
+\subsection{Candidate-Pool Composition and Household Provenance}
 \label{sec:pool_construction}
 
-The candidate pool is built by \emph{feasibility-constrained construction} from the census rather than by sampling a fitted joint model: the constraint-programming (CP) feasible pool and its mixed-integer expansion are described in Section~\ref{sec:cp} and Section~\ref{sec:mip_pool_expansion}. This subsection describes how candidate records---whether observed microdata rows or constructed donor--shell records---are grouped into coherent households before zone-level fitting.
+The candidate pool is built by \emph{feasibility-constrained construction} from the census rather than by sampling a fitted joint model: the constraint-programming (CP) feasible pool and its mixed-integer expansion are described in Section~\ref{sec:cp} and Section~\ref{sec:mip_expansion_formulation}. This subsection describes the household composition those records carry, observed microdata rows and constructed donor--shell records alike, which they bring into the zone-level fit rather than acquiring in a separate grouping stage.
 
-\subfile{files/mip_expansion_process}
-
-\subsubsection{Reconstructing Households}
+\subsubsection{Household composition of the pool}
 \label{sec:households}
-Each candidate record carries household-level and individual-level attributes. A greedy sequential matching heuristic groups individuals into households; the algorithm and complexity analysis are in Appendix~\ref{sec:household_appendix}. Household reconstruction is emphasised as the least controlled stage of the pipeline: its output is not validated against a household-level ground truth beyond the size distribution implied by the census, and its downstream effect is treated as a limitation rather than a validated result.
+Each candidate record carries household-level and individual-level attributes
+and belongs to a household from the moment it enters the pool. No arm reported
+here reconstructs households from ungrouped individuals: the zone fitters group
+the pool by its household identifier (\texttt{ABSHID}) and add, remove or swap
+\emph{whole} households, so household atomicity is a property the pool supplies
+rather than a stage the fitter performs. A thin control cell is filled the same
+way: the builder draws a census household that carries the cell, keeps every
+member, gives the drawn household a fresh identifier, and writes the cell's
+household-level values onto every member and its person-level values onto the
+anchor member. The individuals in a filled cell are therefore donor people
+inside a donor household's composition, not individuals grouped after the fact.
 
-Households are not formed the same way in every arm, so a household-level
-score computed on one arm is not automatically comparable with the same score
-on another (\cref{tab:hh_handling}). The two microdata arms carry the observed
-ABS household identifiers, so every household they emit is a real census
-household. The constructed arms keep the census shells and group only the
-records that infill added; CP-MIP never groups anything at fit time because a
-household is its decision variable, and expansion candidates arrive with their
-dwelling terms already fixed by the shell they were built from.
+Household provenance differs by arm (\cref{tab:hh_handling}) but is in every
+case an observed census household composition. The two microdata arms carry the
+observed ABS household identifiers, so every household they fit is an observed
+census household. The constructed arms keep every observed census household with
+its original identifier, fill thin cells with whole donor households under fresh
+identifiers, and, where a control cell has no carrier in the pool,
+add a whole copy of a real census household that does carry it, under a fresh
+identifier; the copied composition is a real dwelling's, and only the targeted
+attribute is set, within the feasible set for the copied members. When no
+observed household carries the cell, a single feasible household is patched (one
+member for a person-level attribute, every member for a dwelling-level attribute)
+and likewise copied under a new identifier. The expanded-pool arms add, beyond
+this, donor--shell households: a donor person profile grafted onto a real census
+household shell whose dwelling terms are fixed, so the added household is again
+atomic by construction and carries a real dwelling's terms.
 
-The reconstruction is therefore an explicit step with its own error, and it
-is measured on the household table released with the code (648{,}717
-persons): it yields
-308{,}522 households, of which 98.4\% match the stated dwelling size exactly
-(99.3\% within one person; mean error 0.032) and 100\% agree internally on all
-eight dwelling terms, while 98.6\% stay within a single SA2. Two structural
-defects remain. Reconstructed households are too small---mean size 2.10
-against 2.56 in the census microdata, with 44.0\% single-person households
-against 27.0\%---and 17.1\% of the households containing a child under 15
-contain nobody aged 15 or over, which is an unattended-minor household that
-the census never records. These are errors of construction rather than of
-fitting, and they motivate treating this stage as the least controlled part of
-the pipeline rather than as a validated result. %% VERIFY: recomputed from
-%% outputs/hh_match/cleaned_dataset_hhid.csv (post-repair, 2026-10-29).
+Because every pool household is either observed, a donor household drawn whole
+for a thin cell, a whole copy of an observed household, or a donor--shell graft of
+one, the household-size distribution the arms fit is inherited from the census
+rather than reassembled, and the pipeline contains no stage whose function is to
+group loose individuals and cut them to a stated dwelling size. The least
+controlled aspect of this provenance is therefore not a grouping heuristic but
+what is written into those households: a thin cell's household-level values are
+imposed on a donor household's members, the copy reuses an observed composition
+under a new identifier, and the graft places an observed profile into an observed
+shell, so none is validated against a household-level ground truth beyond the
+census size distribution it inherits. What is checked, rather than reconstructed, is agreement within the assembled
+household: the household-level fields are written once and applied to every
+member, so no member can disagree with its own dwelling; expansion households
+are validated individually against the rule set and retried on another shell
+when they fail; and the assembled pool is audited once against the same rules,
+with its infeasible-record count reported.
 
 
 \FloatBarrier
@@ -389,9 +449,10 @@ During validation an inconsistency was identified in the SDMX-derived rent and m
 \centering
 \caption{How each arm obtains the household records it fits. The columns
 state what enters the zone-level fit, what formed it, and the consequence for
-household-level scoring. Only the reconstructed arms introduce a grouping
-step; the others inherit households from the pool or treat the household as
-the unit of fit.}
+household-level scoring. No arm reconstructs households from ungrouped
+individuals: each either carries observed households or adds whole copies or
+donor--shell grafts of them, and the fitter treats the household as the unit of
+selection.}
 \label{tab:hh_handling}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
@@ -405,44 +466,160 @@ the unit of fit.}
 \midrule
 SA-Only & Observed ABS households (1{,}252{,}479 records) & None: persons arrive already grouped, and SA adds, removes and swaps whole households & Household tables are fitted directly; every household emitted is a real census household \\
 IPU-Only & Observed ABS households & None: person and dwelling margins are weighted independently of one another & Nothing ties a household's members to a common weight, so household totals drift downward \\
-CP-pool+SA & Census household shells plus grouped infills & Census rows keep their \texttt{ABSHID}; infilled rows are grouped by household-attribute signature and cut to the stated dwelling size & The pool is feasible by construction, so no repair stage is needed and the shells are real dwellings \\
-CP-pool+IPU & Census household shells plus grouped infills & Same pool and same shells as CP-pool+SA & Pool held fixed, so the difference from CP-pool+SA is the fitter \\
-CP-MIP & One binary per candidate household & None at fit time: the household is the decision unit, so its members are selected together & Household atomicity is automatic; fitting adds no reconstruction error of its own \\
-MIP+SA / MIP+IPU & Shell households plus expansion households & Expansion candidates are built on a real shell, so the added records arrive already atomic & The reconstruction error above is inherited, and expansion adds no new grouping step \\
+CP-pool+SA & Observed census households, donor households drawn for thin cells, and copied coverage households & Observed rows keep their \texttt{ABSHID}; a thin cell is filled by a donor household drawn whole, with its household-level fields set on every member under a fresh id; a cell with no carrier is covered by whole-copying a real census household that carries it (or patching one feasible household) under a fresh id & Every fitted household is an observed composition or a whole copy of one; no grouping or size-cutting step is applied \\
+CP-pool+IPU & Observed census households, donor households drawn for thin cells, and copied coverage households & Same pool and same households as CP-pool+SA & Pool held fixed, so the difference from CP-pool+SA is the fitter \\
+MIP+SA / MIP+IPU & Observed/copied households plus donor--shell expansion households & Expansion grafts a donor profile onto a real census shell with fixed dwelling terms, so the added records arrive already atomic & Added households carry a real dwelling's terms; expansion adds no grouping step \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Constraint-Programming Feasible Pool}
 \label{sec:cp}
-To separate \emph{how the candidate pool is built} from \emph{how it is fitted}, the CP pool is built directly from the census rather than sampled from a learned model: attribute domains are taken from the ABS coding, the same 11 census-consistency rules used throughout are expressed as explicit predicates, and the feasible cell space is the union of every observed census record and structurally feasible but unobserved cells reconstructed by constraint-guided conditional resampling from observed conditionals. The resulting pool is feasible by construction, cell-complete over the modelled attributes, deterministic given a seed, and requires neither a GPU nor a post-hoc repair step: the constraints are the method, not a cleanup stage. The rebuilt pool contains 1{,}404{,}801 persons with zero infeasible records; its only residual coverage gap is the hours-worked codes 101--103, which conflict with the age--hours rule store rather than being absent from the census. \Cref{fig:cp_pool} draws the step as a keep and an add rather than as a filter: the pool exceeds the extract because unobserved but rule-feasible combinations are written in alongside the observed records, not because records were removed.
+To separate \emph{how the candidate pool is built} from \emph{how it is fitted}, the CP pool is built directly from the census rather than sampled from a learned model: attribute domains are taken from the ABS coding, the same 11 census-consistency rules used throughout are expressed as explicit predicates, and the feasible cell space is the union of every observed census record and structurally feasible but unobserved cells reconstructed by constraint-guided conditional resampling from observed conditionals. The resulting pool is feasible by construction, cell-complete over the modelled attributes, deterministic given a seed, and requires neither a GPU nor a post-hoc repair step: the constraints are the method, not a cleanup stage. Because the published microdata carry no sub-region identifier, the pool is keyed to the statistical region rather than to the SA2 itself: a zone is fitted from its region's feasible records, roughly 35{,}000 candidates for an 18{,}600-person zone, and the zone's control margins, not the pool, decide how many of them are selected. The rebuilt pool contains 1{,}396{,}342 persons with zero infeasible records; its only residual coverage gap is the hours-worked codes 101--103, which conflict with the age--hours rule store rather than being absent from the census. \Cref{fig:cp_pool} draws the step as a keep and an add rather than as a filter: the pool exceeds the extract because unobserved but rule-feasible combinations are written in alongside the observed records, not because records were removed.
 
-\begin{figure}[t]
+% The board is taller than \textfraction allows a page to share, so it is given
+% its own page here rather than deferred to the end of the section.
+\clearpage
+\begin{figure}[p]
   \centering
-  \input{files/fig_cp_pool.tex}
-  \caption{How the two pool-construction stages differ. Constraint-guided programming
-  (CP) broadly enriches the observed microdata with rule-feasible individual combinations,
-  retaining the original records and shared household/dwelling terms. The MIP stage then
-  audits a particular zone's pool slice, constructs feasible donor--shell households for
-  zero-capacity cells, and appends only the selected targeted households. The final CP+MIP
-  pool therefore contains broad CP enrichment plus targeted MIP additions; neither pool is
-  yet a zone-level population.}
+  \includegraphics[width=\textwidth]{files/fig_board_pool.pdf}\\[2pt]
+  \includegraphics[width=\textwidth]{files/fig_pool_matching.pdf}
+  \caption{The pool as a board of control cells, and how the board is used to match
+  a zone's marginals. \textbf{Panel (a)}: each row is a control table and each square
+  one of its categories, so the figure plots the cell space a fitter can draw on, not
+  the pool's size in records. Blue squares are cells supplied by an observed census
+  record, green squares cells written in by constraint-guided programming (rule-feasible
+  combinations added while the original records and household/dwelling terms are
+  retained), and amber squares cells added later by a zone's mixed-integer expansion. The
+  extract supplies 262 of the 278 cells drawn, so the pool is larger because cells are
+  written in, not because records are dropped, which makes CP a construction step rather
+  than a cleaning step. \textbf{Panel (b)}: each column is a sample household \(h\) and a
+  filled square a control cell it carries; the fitter chooses the binary selection
+  \(x_h\) and replication counts (each selected household used at most \(r_{\max}\)
+  times) so that the row sums \(\sum_h c_{h,k,m}x_h\) reproduce the SA2 target bars
+  \(E_{z,k,m}\) as closely as the control set allows. Panel (a) says whether a cell has
+  any supply; panel (b), how that supply becomes a marginal match. Neither the CP nor the
+  CP+MIP pool is yet a zone-level population.}
   \label{fig:cp_pool}
 \end{figure}
 
-The CP variants separate pool construction from fitting. \textbf{CP-pool+SA} applies the same SA sampler and iteration budget to the CP pool. \textbf{CP-pool+IPU} applies the same IPU implementation used by IPU-Only to that identical CP pool. The CP-SA versus CP-IPU contrast therefore measures the fitter while holding the candidate pool fixed; CP-IPU versus IPU-Only measures the value of a CP-feasible pool relative to raw microdata; and CP-pool+SA versus SA-Only measures the same pool effect under SA. \textbf{CP-MIP} selects households from the CP pool with a mixed-integer program and relaxes cell tolerances where exact zone-level margins are infeasible; its tolerance is therefore a fitted quantity, not a pass/fail threshold. Across the current CP-MIP run, 454 outputs contain at least one person: the 453 fittable zones plus SA2 308051537, one of the four documented zero-target exclusions, which the solver fitted to a four-person population. The remaining three exclusions have no output, so 454 plus 3 accounts for the whole 457-zone scope (\cref{tab:cohorts}). The CP path recombines observed conditional structure, so it is included to test whether a pool that is feasible by construction is sufficient for zone-level fidelity, and to establish that a rich candidate pool does not require a learned joint model.
+The CP variants separate pool construction from fitting. \textbf{CP-pool+SA} applies the same SA sampler and iteration budget to the CP pool. \textbf{CP-pool+IPU} applies the same IPU implementation used by IPU-Only to that identical CP pool. The CP-SA versus CP-IPU contrast therefore measures the fitter while holding the candidate pool fixed; CP-IPU versus IPU-Only measures the value of a CP-feasible pool relative to raw microdata; and CP-pool+SA versus SA-Only measures the same pool effect under SA. The CP path recombines observed conditional structure, so it is included to test whether a pool that is feasible by construction is sufficient for zone-level fidelity, and to establish that a rich candidate pool does not require a learned joint model.
 
 A coding note that affects every arm. ABS QALFP (field of study) has sixteen two-digit categories: the twelve fields plus Mixed Field Programmes, and the supplementary codes for inadequately described, not stated, not applicable and overseas visitor. The fused microdata column carries fifteen, folding Mixed Field Programmes into ``inadequately described'', and its modal category sits at code 14 where the control tables place ``not applicable'' at 15. Applying the supplementary-code recode that the CP pool builder uses (codes $\ge 12$ shifted up one) reduces the SA-Only qalfp residual by a factor of 20 (0.1384 to 0.0070), which identifies the residual as a coding offset rather than a fit failure. Because the recode is applied inside the CP route and not to the raw-microdata arms, any qalfp comparison between CP and raw populations currently measures the recode; the released config exposes it as a single switch so that both bases can be reported.
 
 \input{files/mip_pool_expansion.tex}
 
-\subsection{Benchmark Analysis}
-\label{sec:benchmark}
-The comparison design is two-factor. The pool is the raw microdata (SA-Only, IPU-Only), the constructed feasible pool (CP-pool+SA, CP-pool+IPU), or the constructed pool with mixed-integer expansion (MIP+SA, MIP+IPU); the fitter is \gls{sa}, \gls{ipu}, or the tolerance-relaxed MIP (CP-MIP). \Cref{tab:pool_fitter_matrix} states, for each of the seven arms, the cohort on which it has completed and the metric basis, so that no arm is credited with a number it has not produced. SA-Only and IPU-Only are the fixed-support controls; CP-pool+SA isolates the pool effect under a fixed fitter; CP-pool+IPU isolates the fitter under a fixed pool; CP-MIP tests what feasibility buys when it is optimised directly; and the two expanded-pool arms are the experiment on which the paper's pool-side argument rests.
+\subsection{What the pool adds}
+\label{sec:pool_growth}
+Table~\ref{tab:pool_growth} isolates the pool-side return without using any fitted
+result. Relative to the raw extract, CP construction adds 143{,}863 persons
+(11.5\%) and 60{,}982 households (12.5\%), and raises the number of distinct
+21-attribute tuples from 1{,}073{,}938 to 1{,}160{,}082. The region-keyed slice
+gives the fitter almost two candidate persons per intended person
+(Section~\ref{sec:cp}); expansion then adds only about 184 persons per zone,
+because it targets cells rather than volume. Expansion adds a further
+67{,}475 persons and 19{,}325 households, but only 1{,}633 additional tuples:
+its purpose is coverage, not novelty. All 2{,}523 sourceable zero-capacity cells
+reach the \(\nu_c\) requirement; the 386 that remain are structural codes with no
+resident donor. The HHTS layer leaves the census tuple count unchanged and equips
+all 569{,}024 households with bike, e-bike and scooter values, with 267{,}706 rows
+matched within their HHTS \texttt{REGUCP}. The pool therefore becomes more
+attractive in the sense that matters downstream (more supported cells and more
+travel-relevant attributes) without altering the census marginals that the zone
+fitter is asked to match.
 
 \begin{table}[h!]
 \centering
-\caption{The pool $\times$ fitter design, with the completion status of each arm. Mean and median RSSZ are reported on the \textbf{11 control tables shared by every arm} over the \textbf{353 zones} with complete coverage of those tables; smaller is better. RSSZ is the primary objective for SA, but it can also be calculated post hoc for IPU and CP-MIP. CP-MIP minimises cell tolerance rather than RSSZ, so its post-fit RSSZ is a diagnostic rather than an optimisation result and is marked pending until the completed populations are rescored.}
+\caption{What each pool stage adds. Person and household counts are row counts;
+distinct tuples use the 21 modelled attributes. Zero-capacity cells are counted
+before expansion; ``at \(\nu_c\)'' counts those meeting their carrier requirement
+after expansion. Structural residuals are the 386 cells whose codes have no
+resident donor: \texttt{qalfp:16} (353), \texttt{vehrd:6} (19) and
+\texttt{strd:6} (14). HHTS travel indicates whether the observed travel fields
+are present.}
+\label{tab:pool_growth}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrrc@{}}
+\toprule
+Stage & Persons & Households & Distinct tuples & Zero-capacity & At \(\nu_c\) & Structural & HHTS travel \\
+\midrule
+Raw census        & 1{,}252{,}479 & 488{,}717 & 1{,}073{,}938 & n/a & n/a & n/a & no \\
+CP feasible pool  & 1{,}396{,}342 & 549{,}699 & 1{,}160{,}082 & 2{,}909 & 0 & 386 & no \\
+CP + MIP expansion & 1{,}463{,}817 & 569{,}024 & 1{,}161{,}715 & 2{,}909 & 2{,}523 & 386 & no \\
+CP + MIP + HHTS   & 1{,}463{,}817 & 569{,}024 & 1{,}161{,}715 & 2{,}909 & 2{,}523 & 386 & yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Figure~\ref{fig:pool_before_after} makes the same point at zone level. For
+112011236 (the worked example used in the audit), the number of target cells
+with no carrier falls from 9 to 1 while the slice grows by only 347 persons
+(1.0\%) and 98 households. Eight cells become selectable; the one that remains
+is the structural code \texttt{qalfp:16}. Expansion therefore changes what the
+fitter can reach far more than it changes how much material it has.
+
+\input{files/pool_before_after.tex}
+
+Table~\ref{tab:pool_support_stats} puts the same result on a cohort basis. Only
+3.5\% of the 81{,}988 positive-target control cells are unreachable in the base
+slice, and expansion covers 86.7\% of those, leaving 386 cells. Those 386 carry
+9{,}720 target units, 0.016\% of the 60.5 million target units across all control
+cells, and all lie in three codes. The intervention is therefore narrow in both
+count and mass: it repairs a small number of cells that are individually decisive
+for their tables, not a broad failure of the pool. The typical zone shows one
+residual cell: 329 of 367 zones have exactly one, 14 have none, and 24 have two or
+three. The coverage set uses 5{,}670 households and 20{,}260 persons, or 2.25
+households and 8.0 persons per covered cell; the released menu adds a further
+13{,}655 households so that each SA2 has more than the coverage-minimal set to fit
+from.
+
+\begin{table}[h!]
+\centering
+\caption{Pool support across the 367-zone cohort, using the 19 control tables
+available to the expansion audit rather than the 11-table benchmark basis. A
+zero-capacity cell is a positive-target control cell with no candidate in the
+zone's base slice. The coverage set is the coverage-minimal selection; the
+appended menu is the rest of the constructed candidates released to the zone.
+Target mass is the sum of positive control-cell targets across all tables;
+because a person appears in several person-level tables, it is a table mass
+rather than a population count.}
+\label{tab:pool_support_stats}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Statistic} & \textbf{Value} \\
+\midrule
+Zones in the cohort & 367 \\
+Positive-target control cells & 81{,}988 \\
+Zero-capacity cells before expansion & 2{,}909 (3.5\% of cells) \\
+\quad covered by the support block & 2{,}523 (86.7\% of zero cells) \\
+\quad residual after expansion & 386 (0.016\% of target mass) \\
+Zones with all zero cells covered & 14 (3.8\%) \\
+Zones with one / two or three residual cells & 329 (89.6\%) / 24 (6.5\%) \\
+Per-zone coverage rate, median (range) & 87.5\% (70.0--100\%) \\
+Zero cells per zone, median (range); zones at median & 8 (1--11); 258 \\
+Coverage set, households (persons) & 5{,}670 (20{,}260) \\
+Coverage set per zone, median (max) & 14 (69) households; 50 (277) persons \\
+Appended menu, households & 13{,}655 \\
+Released pool addition, households (persons) & 19{,}325 (67{,}475) \\
+Residual cells: \texttt{qalfp:16} / \texttt{vehrd:6} / \texttt{strd:6} & 353 / 19 / 14 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\input{files/expansion_composition.tex}
+
+\input{files/full_cohort_audit.tex}
+
+\subsection{Benchmark Analysis}
+\label{sec:benchmark}
+\Cref{tab:pool_fitter_matrix} reports the CP-only and MIP arms of the two-factor (pool $\times$ fitter) design defined in \cref{tab:strategy_roles}, plus the composition-controlled SA and IPU variants, each with the cohort it has completed on and its metric basis. SA-Only and IPU-Only are the fixed-support controls; the CP-only pair isolates the pool at construction; the MIP pair isolates the expansion step; and the composition-controlled variants isolate the append filter.
+
+\begin{table}[h!]
+\centering
+\caption{The pool $\times$ fitter design, with the completion status of each arm. Mean and median RSSZ are reported on the \textbf{11 control tables shared by every arm}, summed per zone, over the identical \textbf{367-zone fitted cohort}; smaller is better. Every row is on that one basis, so the rows are directly comparable and no arm is credited with a number produced on a different table set.}
 \label{tab:pool_fitter_matrix}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
@@ -450,34 +627,41 @@ The comparison design is two-factor. The pool is the raw microdata (SA-Only, IPU
 \toprule
 \textbf{Arm} & \textbf{Pool} & \textbf{Fitter} & \textbf{Zones} & \textbf{Mean} & \textbf{Median} & \textbf{Status} \\
 \midrule
-SA-Only      & raw microdata & SA  & 353 & 0.416 & 0.276 & Complete on the 11 shared tables \\
-IPU-Only     & raw microdata & IPU & 353 & 0.376 & 0.250 & Complete on the 11 shared tables \\
-CP-pool+SA   & CP feasible   & SA  & 353 & \textbf{0.205} & \textbf{0.188} & Complete on the 11 shared tables \\
-CP-pool+IPU  & CP feasible   & IPU & --- & --- & --- & Built (340 populations); no 11-table scoring \\
-CP-MIP       & CP feasible   & MIP & 353 & --- & --- & Post-fit 11-table RSSZ pending; minimax cell error is the optimisation objective \\
-MIP+SA       & CP + expansion & SA & --- & --- & --- & Pool audited on 10 zones; fit not run \\
-MIP+IPU      & CP + expansion & IPU & --- & --- & --- & Pool audited on 10 zones; fit not run \\
+SA-Only      & raw microdata & SA  & 367 & 0.247 & 0.233 & Complete; 11 tables \\
+IPU-Only     & raw microdata & IPU & 367 & 0.435 & 0.275 & Complete; 11 tables \\
+CP-only+SA   & CP feasible pool & SA  & 367 & 0.285 & 0.163 & Complete; 11 tables \\
+CP-only+IPU  & CP feasible pool & IPU & 367 & 0.324 & 0.193 & Complete; 11 tables \\
+MIP+SA       & CP + MIP pool & SA  & 367 & 0.511 & 0.295 & Complete; 11 tables \\
+MIP+IPU      & CP + MIP pool & IPU & 367 & 0.315 & 0.193 & Complete; 11 tables \\
+MIP+SA (comp.) & CP + composition filter & SA & 367 & 0.250 & 0.158 & Complete; 11 tables \\
+MIP+IPU (comp.) & CP + composition filter & IPU & 367 & 0.302 & 0.196 & Complete; 11 tables \\
 \bottomrule
 \end{tabular}
 \end{table}
-{\footnotesize\textit{Note:} the 11 shared tables are the control tables carried by every completed arm (heap, mstp, mtwp, occp, rlhp, sexp, hind, mrerd, nprd, rntrd, vehrd). RSSZ is optimised by SA, while IPU and CP-MIP can be rescored against the same 11-table basis after fitting; such a value measures realised marginal error but does not imply that the fitter optimised RSSZ. CP-MIP now minimises the worst relative cell deviation, protecting individual cells from being sacrificed to a weighted aggregate objective. Its RSSZ remains a post-fit diagnostic, reserved for the 353-zone common cohort. The two expanded-pool rows are deliberately empty: the expansion mechanism has been audited as a pool-construction step (Section~\ref{sec:mip_pool_expansion}) but the zone fits that would fill them have not been run, and the refit is blocked by a seeding defect described in the released run notes, so a number there would come from a different cohort or a defective harness.}
+{\footnotesize\textit{Note:} all scored rows are computed from the released summaries on the same 367 zones and the same 11 shared tables, summed per zone, so the columns are comparable across rows. CP-only and MIP arms are now complete refits; the composition-filtered arms are MIP variants. The paired CP-only/MIP difference isolates the effect of expansion, while the composition-filtered rows isolate the effect of the append filter.}
 
-\textbf{The pool effect on a conventional fitter.} On the primary 11-table basis, mean RSSZ is reduced by 51\% by CP-pool+SA relative to SA-Only (0.205 against 0.416) and the median by 32\% (0.188 against 0.276), with every zone drawn from the same 353-zone cohort and every table from the same 11-table set. The improvement is therefore attributable to the candidate pool: the fitter, its iteration budget, its temperature schedule and its acceptance rule are identical in the two arms, and the only difference is whether the records were drawn from the raw microdata or constructed under the rule set. Two mechanisms are consistent with the size of the gain. The constructed pool is cell-complete over the modelled attributes, so a category that the 5\% microsample happens to miss in a zone is still selectable; and it is not confined to joint combinations the microsample contains, so a zone whose household-level marginals require an archetype absent from the sample is no longer forced to accept the nearest available real household. It is noted that the pool also differs in size (1{,}404{,}801 records against 1{,}252{,}479), so this comparison identifies the constructed pool as a whole, not the feasibility property alone.
+\textbf{The pool effect under a fixed fitter.} On the matched basis the pool changes the outcome, and for the weight-only fitter the change is a gain: mean RSSZ falls from 0.435 under IPU-Only to 0.324 under CP-only+IPU and 0.315 under MIP+IPU, and the median from 0.275 to 0.193, across the identical 367 zones and the same shared tables. The candidate pool is the only component that differs between those two rows, so the difference is attributable to it. The gain is substantial, about 28\% of the mean, and it is not uniform across zones; what it establishes is that a feasible, cell-complete pool is fittable at this granularity and that its support advantage reaches the fitted population. Changing the fitter while holding the pool at raw microdata moves the mean further, from 0.435 to 0.247, so on this evidence both components bind: the pool improves a weight-only allocation, and \gls{sa} on raw records is already the strongest marginal fitter in the design. The constructed-pool rows also show a pool--fitter interaction, but the interaction is compositional rather than intrinsic to SA. CP-only+SA scores 0.285, close to SA-Only (0.247), while MIP+SA scores 0.511; the 300-donor full-menu build is worse still, at 1.822. When the appended menu is composition-filtered, MIP+SA scores 0.250 and 0.158, matching SA-Only's mean and improving its median, while MIP+IPU scores 0.302 and 0.196. The MIP penalty is therefore attributable to the appended records rather than to the constructed pool itself. Because the composition-controlled arm adds a post-hoc filter, the clean pool contrast remains CP-only+IPU against IPU-Only, which share one zone set and differ only by the constructed pool. Neither component alone accounts for fidelity, which is why the arms are read as a grid rather than as a ranking. The contrast is also confounded in one direction that cannot be removed here: the constructed pool differs from the raw microdata in size and composition as well as in feasibility, so it identifies the pool as a whole rather than the feasibility property alone.
 
-\textbf{Fitter contrast under a fixed pool.} CP-MIP shows what optimising feasibility directly achieves, and the answer is a caution. Across the 453 fittable zones the worst cell of the median zone misses its target by a factor of 10.5 (interquartile range 7.0--15.1 across zones) and that of the best zone by 0.57, while the typical cell misses by 18\%: no zone comes within 5\% on every cell. The typical cell is therefore close and a small number of cells with small targets set the tolerance, which is what a mutually inconsistent control set looks like once it is solved exactly rather than weighted. Feasibility of individual records at pool construction therefore does not imply exact zone-level marginal fit after fitting: the mixed-integer program finds a feasible selection, but the control tables it must satisfy simultaneously are mutually inconsistent at zone level, so the tolerance relaxation---not the solver---determines the outcome. This is the reason the mixed-integer route is reported as a diagnostic instrument and as a pool-construction tool rather than as a replacement for SA.
+Table~\ref{tab:pathological_zones} isolates the zones where both constructed-pool fitters fail. In 302031036 the MIP-expanded pool lacks the dwelling records needed for \texttt{rntrd}, \texttt{mrerd} and \texttt{vehrd}: MIP+SA scores 13.45 and MIP+IPU 27.57, while SA-Only scores 0.016 on its raw records. In 112011237 the failure is the household-size trade-off discussed above. These zones are reported as pool gaps, not as evidence about the fitter; they remain in the cohort means and explain part of the MIP+SA tail.
 
-\textbf{What the expanded-pool arms test.} The expansion argument is a claim about a specific failure mode: a control cell with a positive target and zero attainable capacity in the zone's pool cannot be matched by any weight vector or selection, because no candidate carries the cell. Removing that blockage is a necessary condition for the fitter to reach the cell, and it is not a claim that the fit is otherwise improved. The mechanism audit in Section~\ref{sec:mip_pool_expansion} establishes that the blockage can be removed with a handful of feasible households. Whether the fitted metrics move is a separate question, and it is the one the two empty rows are reserved for.
+\input{files/pathological_zones.tex}
+
+Table~\ref{tab:cp_sa_tail} separates search budget from pool composition on the five worst MIP+SA zones. With 5{,}000 iterations and a MIP+IPU seed, four improve by 55--78\%: 112011237 from 3.64 to 1.63, 309071256 from 4.46 to 1.06, 314011386 from 3.67 to 1.08, and 303051073 from 2.92 to 0.65. The fifth, 302031036, remains the pathological pool gap and is not improved by the seed. The tail is therefore partly budget- and initialization-limited; the median gap is structural.
+
+\input{files/cp_sa_tail.tex}
+
+\textbf{What the expanded-pool arms test.} The mechanism and its audit are given in Section~\ref{sec:mip_pool_expansion} and Appendix~\ref{sec:pool_expansion_audit}. The expanded-pool arms run with the support block on while their CP-pool counterparts run with it off, and differ only in whether the constructed records are admitted, so the RSSZ difference between CP-pool+SA and MIP+SA, and between CP-pool+IPU and MIP+IPU, is the fitted effect of pool support. Whether the fitted metrics move is the question those pairs are designed to answer.
 
 Some results remain weak for particular attributes and sparse zones. Those failures are
 reported rather than hidden: the benchmark tables retain per-table and per-zone
 distributions, and the interpretation distinguishes (i) candidate-pool coverage,
-(ii) household reconstruction consistency, and (iii) zone-level optimisation. A good
+(ii) household consistency, and (iii) zone-level optimisation. A good
 association score does not compensate for poor household totals or a large RSSZ in a
 sparse zone, and no component is described as a universal solution.
 
 \gls{ipu} optimises weights independently at individual and household levels, which can leave population totals under- or over-filled \citep{Khachman2021ImpactQuality}; \gls{sa} incorporates totals as explicit targets.
 
-\textbf{Computational cost.} The CP path is CPU-only and requires no GPU: constructing the pool took 27.1 minutes and 5.0 GB of memory, and expansion solved all ten audit zones to optimality in 1{,}013.5 seconds (about 100 seconds per zone). SA requires $\approx$2--8 minutes per zone (1{,}000 iterations); the 353 zones are parallelised into 20 chunks per fitting variant. CP-pool+SA runs the same SA budget, and CP-MIP solves one tolerance-relaxed mixed-integer program per fit. The full 453-zone refit is therefore bounded by the fitting stage, measured at 18.8--33.7 minutes per zone locally and 1.14 hours per zone on PBS, which is why the refit must be submitted in chunks rather than as a single job.
+\textbf{Computational cost.} The CP path is CPU-only and requires no GPU: constructing the pool took 27.1 minutes and 5.0 GB of memory, and expansion solved the released ten-zone audit to optimality in 1{,}013.5 seconds (about 100 seconds per zone), then scaled to \ExpZones{} zones with every support solve again optimal. SA requires $\approx$2--8 minutes per zone (1{,}000 iterations); the 367 zones are parallelised into 20 chunks per fitting variant. CP-pool+SA runs the same SA budget. The full 367-zone refit is therefore bounded by the fitting stage, measured at 18.8--33.7 minutes per zone locally and 1.14 hours per zone on PBS, which is why the refit must be submitted in chunks rather than as a single job.
 
 \FloatBarrier
 
@@ -492,139 +676,172 @@ Four distinct outcome families are therefore reported: (i) marginal fit,
 an overall improvement when it wins one family while materially degrading another.
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{marginal_difference_lines_301031018.png}
-\caption{Signed category-level marginal differences for one common SA2 zone. Each line is
-the synthetic share minus the census target share in percentage points; the zero line
-therefore represents exact marginal agreement. Individual controls are counted per
-person and household controls once per dwelling. The panel is a diagnostic of the
-error pattern, not a replacement for the cohort-level TVD summaries.}
+\includegraphics[width=\textwidth]{fig4_marginals_by_arm.png}\caption{Synthesised versus true census marginals for the \texttt{heap} (highest educational
+attainment) control table, on the 60-zone cohort on which all four arms are available.
+Each category shows five bars: the census target (grey) followed by SA-Only, IPU-Only,
+CP-pool+SA and CP-pool+IPU. A level set of bars reproduces the marginal; a gap is a
+shortfall or an overshoot. The Not applicable category (code 11) and the effectively empty
+code 12 are excluded because they dominate or add nothing to the remaining categories;
+they are reported in the accompanying table instead. The consistent feature across every
+arm is a property of the pool rather than of the fitter: the Certificate I \& II level is
+under-produced everywhere, because the fused microdata contains almost no records at that
+level. Total-variation distances for all nineteen in-sample control tables are summarised
+in Figure~\ref{fig:marginals_all_tables}.}
 \label{fig:marginal_differences}
 \end{figure}
 
-\subsubsection{Joint Distribution Validation (Cram\'{e}r's V)}
-\label{sec:cramer}
-Cram\'{e}r's V is computed between each strategy's \emph{final} synthetic population (post fitting) and the original microdata. SA-Only draws from a 13-attribute microdata subset and therefore populates only the 12 control attributes it shares with the constructed pool; association preservation is evaluated over the identical \textbf{66 attribute pairs} formed from those \textbf{12 shared attributes}, a like-for-like basis.
-
-The raw-microdata arms are loose against the reference: SA-Only attains $r=0.912$ and IPU-Only $r=0.910$. SA-Only's mean Cram\'{e}r's V is inflated (0.194 against 0.134 in the microdata) and it lies systematically \emph{above} the diagonal, over-stating a subset of household and relationship associations it can only assemble from the joint combinations already present in the fixed microdata sample. Of the 66 pairs, \textbf{8 (12\%)} exceed $|\Delta V|>0.15$ (\cref{tab:cramer_gaps}). This is the direct signature of a support-limited pool: when the required combination is absent, the fitter substitutes the nearest available household, and the substitution manufactures an association the census does not record. The constructed-pool arms are scored on the same 66 pairs in the cohort-matched audit below, where CP-MIP's mean absolute deviation is 0.077.
-
-\begin{table}[h!]
+\begin{figure}[t]
 \centering
-\caption{The 8 SA-Only attribute pairs (of the 66 shared with the full attribute set) whose synthetic--microdata Cram\'{e}r's V deviation exceeds $|\Delta V|>0.15$. Each is a household-composition pair whose required combination is absent from the zone's microdata slice.}
-\label{tab:cramer_gaps}
-\begin{tabular}{@{}lccc@{}}
-\toprule
-\textbf{Pair} & \textbf{Synth.\ $V$} & \textbf{Micro.\ $V$} & \textbf{$|\Delta V|$} \\
-\midrule
-heap $\times$ vehrd & 0.289 & 0.045 & 0.244 \\
-hind $\times$ vehrd & 0.449 & 0.229 & 0.220 \\
-rlhp $\times$ vehrd & 0.352 & 0.133 & 0.219 \\
-agep $\times$ rlhp  & 0.508 & 0.322 & 0.185 \\
-heap $\times$ rlhp  & 0.429 & 0.252 & 0.177 \\
-nprd $\times$ vehrd & 0.416 & 0.240 & 0.177 \\
-heap $\times$ hind  & 0.223 & 0.070 & 0.152 \\
-agep $\times$ mstp  & 0.576 & 0.426 & 0.150 \\
-\bottomrule
-\end{tabular}
-\end{table}
+\includegraphics[width=\textwidth]{fig_fit_example.png}
+\caption{Worked example of the fitting process for one SA2 zone (301011004)
+under MIP+SA. \textbf{Left:} the annealing trace at 200-iteration
+checkpoints; the objective is the RSSZ sum over the nineteen control tables.
+The solid line is the current solution and the dashed line the best seen so
+far. At this sampling resolution the two coincide at all five checkpoints,
+but the chain is not a monotone descent: it accepted 575 moves, of which 441
+improved the objective and 134 did not. The 200-iteration checkpoints hide
+those accepted non-improving moves. The auto-calibrated temperature
+is small because the measured cost of a worsening swap is of order $10^{-4}$,
+so the excursions are local and the best solution plateaus early; the
+remaining budget buys little, but the chain is a genuine annealer rather than
+a greedy descent. \textbf{Right:} the per-table decomposition of the same
+zone's final residual. Dark bars are dwelling-level tables, light bars
+person-level tables; the dotted line marks an RSSZ of 0.1. The largest
+residuals are person-level (\texttt{hrsp} 0.17, \texttt{typp} 0.15,
+\texttt{mtwp} 0.11, \texttt{indp} 0.09); every dwelling-level table is below
+0.03. The example is a single zone and is illustrative of the
+error pattern, not a cohort-level estimate.}
+\label{fig:fit_example}
+\end{figure}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{joint_pair_lines.png}
-\caption{Joint-variable diagnostics for the five active non-GAN strategies on the
-213-zone audit cohort. The left panel shows total-variation distance for each of the
-eight designed joint pairs; the right panel shows the absolute difference between
-synthetic and microdata Cram\'{e}r's $V$. Lower values are better. These lines show
-where each strategy departs from the reference, rather than collapsing the pairs
-into one mean.}
-\label{fig:joint_pair_lines}
+\includegraphics[width=\textwidth]{fig_pool_gain_ipu.png}
+\caption{What the expanded candidate pool changes for a fixed fitter, on the
+shared 60-zone marginal panel. Both arms use the
+identical IPU implementation and differ only in the pool (raw microdata against the
+constructed and expanded pool), so this is a pool contrast with the fitter held constant.
+\textbf{Left:} the \texttt{qalfp} (field of study) residual, which falls from 0.497 to
+0.055. This is the supplementary-code recode documented in Section~\ref{sec:cp}, applied
+in the CP route but not the raw route, rather than a pool effect.
+\texttt{qalfp} is shown only in the left panel by design; it is not omitted from
+the right-hand comparison.
+\textbf{Right:} the remaining eighteen control tables. Every red marker (IPU-Only) lies to
+the left of its green counterpart, i.e.\ the expanded pool is marginally worse on all
+eighteen, with a mean TVD of 0.087 against 0.100. Read together, the two panels show that
+the aggregate improvement of this arm is carried entirely by one recoded attribute: on the
+attributes where no coding difference exists the expanded pool neither helps nor materially
+hurts the IPU fit. Any \texttt{qalfp} comparison between constructed-pool and
+raw-microdata populations therefore measures the recode rather than the pool, which is why
+the two are reported separately here.}
+\label{fig:pool_gain_ipu}
 \end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_pool_gain_sa.png}
+\caption{The same pool contrast for the SA fitter, on the shared 60-zone
+marginal panel. Both arms use the identical SA implementation and differ only
+in the pool. \textbf{Left:} the \texttt{qalfp} residual falls from 0.479 to
+0.026, the same supplementary-code recode documented for the IPU pair, not a
+pool effect. \textbf{Right:} the remaining eighteen control tables. The
+expanded pool improves five (\texttt{nprd}, \texttt{vehrd}, \texttt{hind},
+\texttt{mstp}, \texttt{mrerd}) and worsens thirteen, with a mean TVD of 0.068
+against 0.072. Outside the recoded attribute and the household-size table the
+constructed pool therefore does not improve SA's marginals, consistent with the
+aggregate MIP+SA result in Table~\ref{tab:pool_fitter_matrix}. The figure
+is descriptive of the marginal panel, not a cohort-level estimate.}
+\label{fig:pool_gain_sa}
+\end{figure}
+
+\begin{table}[h!]
+\centering
+\caption{Category-level composition of the \texttt{heap} (highest educational attainment)
+marginal, in per cent of persons, on the shared 60-zone cohort. \texttt{heap} is the control
+table the fit is asked to match on educational attainment, so each row is one attainment
+level and a well-fitted arm reproduces the census column. This is the table whose coding was
+repaired before this run: in the raw ABS export the two certificate rows are transposed,
+which had placed the 12.7\% certificate group on the wrong level.}
+\label{tab:heap_categories}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Attainment level} & \textbf{Census} & \textbf{SA-Only} & \textbf{IPU-Only} &
+\textbf{CP-SA} & \textbf{CP-IPU} \\
+\midrule
+Postgraduate degree              &  3.9 &  3.9 &  3.7 &  3.7 &  3.5 \\
+Graduate diploma/certificate     &  2.1 &  2.0 &  1.8 &  1.9 &  1.7 \\
+Bachelor degree                  & 13.8 & 13.4 & 12.7 & 12.8 & 12.3 \\
+Advanced diploma                 &  8.6 &  8.6 &  7.9 &  8.1 &  7.5 \\
+Certificate III \& IV            & 15.3 & 16.2 & 15.4 & 15.4 & 14.8 \\
+Secondary, year 10 and above     & 22.3 & 24.4 & 23.9 & 25.0 & 23.5 \\
+Certificate I \& II              &  1.7 &  0.1 &  0.1 &  0.1 &  0.0 \\
+Secondary, year 9 or below       &  2.1 &  5.8 &  5.3 &  6.0 &  5.3 \\
+Supplementary codes              &  1.1 &  2.5 &  2.3 &  2.5 &  2.2 \\
+Not stated                       &  7.4 &  6.3 &  5.0 &  5.3 &  4.6 \\
+Not applicable                   & 21.7 & 16.9 & 22.1 & 19.2 & 24.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+{\footnotesize\textit{Note:} the repaired coding places the large certificate group on
+Certificate III \& IV (census 15.3\%, arms 13.6--16.2\%) and the small one on Certificate
+I \& II (census 1.7\%). Every arm still falls short on Certificate I \& II (0.0--0.1\%), and
+no fitter can close that gap: the correction fixed the \emph{target}, but the fused
+microdata holds only 0.1\% of persons at that level, so the cell remains short of
+candidates. The residual is a property of the sample, not of any arm. ``Not applicable''
+shows the largest cross-arm spread, from 19.2\% for CP-SA to 24.5\% for CP-IPU against a
+census 21.7\%, which is consistent with the household-composition difference reported in
+the text.}
+
 
 \FloatBarrier
 
-\subsubsection{IPU Baseline Comparison}
-\label{sec:ipu_baseline}
-The IPU baseline tests whether the fitting algorithm or the candidate pool drives the outcome. \Cref{tab:ipu_comparison} summarises the two raw-microdata approaches on the completed metrics.
-
-\begin{table}[h!]
-\centering
-\caption{The two raw-microdata strategies across RSSZ, external TVD/SRMSE, and the unseen share. Both draw from the 1{,}252{,}479-record census donor, so appending the constructed-pool arms to this table measures the pool with the fitter held fixed.}
-\label{tab:ipu_comparison}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{@{}lrrrrrc@{}}
-\toprule
-\textbf{Approach} & \textbf{Mean RSSZ} & \textbf{TVD (med.)} & \textbf{TVD (mean)} & \textbf{SRMSE (mean)} & \textbf{Uniqueness} & \textbf{Unseen} \\
-\midrule
-SA-Only (Ap.~0)  & 0.416 & 0.500 & 0.367 & \textbf{40.7} & 96.4\% & 0\% \\
-IPU-Only (Ap.~1) & N/A & 0.500 & 0.374 & 54.3 & --- & 0\% \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-{\footnotesize\textit{Note:} RSSZ is N/A for IPU (IPU does not optimise the RSSZ objective); the SA value is the primary 11-table comparison of \cref{tab:pool_fitter_matrix}. Uniqueness and the unseen share are measured over the fitted populations of the 213 zones common to both arms, so neither arm is credited or penalised for covering more zones. The unseen share is the fraction of individuals whose full attribute vector (20 attributes) is absent from the pool's microdata-sourced records: 0\% by construction for both raw-microdata methods, which resample the census seed verbatim. SA's within-zone uniqueness is 96.4\%, so the raw arm is diverse within a zone even though none of its individuals is absent from the donor.}
-
 \subsection{Population Diversity and Uniqueness}
 \label{sec:diversity}
-Three diversity measures answer different questions and are easily conflated, and all comparisons below use a common zone cohort. \textbf{Within-zone uniqueness} (proportion of a zone's individuals whose attribute combination is not shared by another individual in the same zone) saturates near 100\% for any method drawing from a pool much larger than one zone and separates the approaches only slightly (SA-Only 96.4\%). \textbf{Cross-zone cloning} (proportion of an arm's distinct attribute combinations that also appear in another zone) measures reuse of the same content across geographies; the census seed spreads its records over more distinct attribute combinations than the constructed pool does, so a population drawn from a smaller, denser pool necessarily reuses each combination across more zones. Cloning therefore ranks donor diversity rather than synthesis quality. \textbf{The unseen share} (proportion of individuals whose attribute combination appears in no microdata record) is the measure that separates the arms, and it is a property of construction: an observed census row is 0\% by definition, whereas a record assembled from observed conditionals can carry a combination the sample does not contain.
+Three diversity measures answer different questions and are easily conflated. \textbf{Within-zone uniqueness} (proportion of a zone's individuals whose attribute combination is not shared by another individual in the same zone) saturates near 100\% for any method drawing from a pool much larger than one zone and therefore separates the approaches only slightly. \textbf{Cross-zone cloning} (proportion of an arm's distinct attribute combinations that also appear in another zone) measures reuse of the same content across geographies; the census seed spreads its records over more distinct attribute combinations than the constructed pool does, so a population drawn from a smaller, denser pool necessarily reuses each combination across more zones. Cloning therefore ranks donor diversity rather than synthesis quality. \textbf{The unseen share} (proportion of individuals whose attribute combination appears in no microdata record) is the measure that separates construction routes, and it is a property of construction: an observed census row is 0\% by definition, whereas a record assembled from observed conditionals can carry a combination the sample does not contain.
 
 Care is needed about what the unseen share proves. An unseen combination is not automatically realistic \citep{Kim2023ASynthesis}. The relevant assurance for this pipeline is stronger than for a repaired generative pool: every record in the constructed pool and every record added by expansion satisfies the eleven structural rules \emph{at construction}, so the unseen share reflects feasible combinations that the microsample simply did not capture, not arbitrary recombinations that a later stage had to correct. Appendix~\ref{sec:pool_expansion_audit} reports the operational pool-expansion audit, which states per zone how many zero-capacity cells were filled, with how many records, and which cells could not be sourced.
 
-\subsubsection{Common-Sample Audit Across the Completed Methods}
-\label{sec:audit}
-The full-cohort runs differ in table coverage and per-zone output size, so the methods are also compared on a stricter common basis: only zones that every arm in the comparison has actually fitted, the 20 attributes common to all outputs, and at most 8{,}000 persons per zone, drawn at random. Because CP-pool+SA retains only 18 populations on disk, a single all-arm cohort would collapse the audit to 11 zones, so \Cref{tab:six_method_audit} reports two cohort-matched panels: the three arms with full coverage on the 213 zones they share (Panel A), and four arms on the 11 zones shared with CP-pool+SA (Panel B), which lets the CP-pool arm be scored on equal terms instead of being compared across a different geography. The CP-pool+IPU arm is omitted until it has the same capped-output files and diagnostics. Each panel reports within-zone duplication, cross-zone cloning, the unseen share, mean joint TVD over eight designed joint pairs, mean absolute Cram\'{e}r's $V$ difference, and the fraction of joint pairs resolved at a TVD of 0.1 or less. The 8{,}000 cap equalises output size but truncates large zones, so these values are not directly interchangeable with the full-output figures above; they are an internal, like-for-like audit.
-
-\begin{table}[h!]
-\centering
-\caption{Cohort-matched audit of the completed synthesis strategies. Panel A: the three arms with full coverage, on the 213 zones they all fitted (80 sampled per arm). Panel B: four arms, on the 11 zones shared with CP-pool+SA. Lower within-zone duplication, cross-zone cloning, joint TVD, and mean absolute Cram\'{e}r's $V$ difference are better; a higher unseen share and resolved fraction are better.}
-\label{tab:six_method_audit}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{@{}lrrrrrrr@{}}
-\toprule
-\textbf{Method} & \textbf{Zones} & \textbf{Within-zone} & \textbf{Cross-zone} & \textbf{Unseen} & \textbf{Joint} & \textbf{Mean} & \textbf{Resolved} \\
- & & \textbf{dup.} & \textbf{clone} & & \textbf{TVD} & $\mathbf{|\Delta V|}$ & \\
-\midrule
-\multicolumn{8}{@{}l}{\emph{Panel A: 213-zone cohort shared by the three arms with full coverage}}\\
-CP-MIP       & 80 & 89.5\% & 38.7\% & 75.7\% & 0.179 & \textbf{0.077} & 37.5\% \\
-IPU-Only     & 80 & 2.6\% & 72.9\% & 0\% & 0.172 & 0.128 & 12.5\% \\
-SA-Only      & 80 & \textbf{2.2\%} & 63.5\% & 0\% & \textbf{0.133} & 0.127 & \textbf{50.0\%} \\
-\midrule
-\multicolumn{8}{@{}l}{\emph{Panel B: 11-zone cohort shared with CP-pool+SA}}\\
-CP-MIP       & 11 & 91.8\% & 49.4\% & 69.6\% & 0.243 & 0.114 & 12.5\% \\
-CP-pool+SA   & 11 & 1.0\% & \textbf{36.2\%} & \textbf{86.9\%} & 0.181 & \textbf{0.098} & 0.0\% \\
-IPU-Only     & 11 & \textbf{0.3\%} & 81.9\% & 0\% & 0.187 & 0.136 & 12.5\% \\
-SA-Only      & 11 & 4.3\% & 83.5\% & 0\% & \textbf{0.172} & 0.111 & \textbf{25.0\%} \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-{\footnotesize\textit{Note:} Zone counts are the arms scored from the cohort named in each panel heading; Panel A samples 80 of the 213 shared zones per arm, Panel B uses all 11 (random seed 42). ``Within-zone dup.'' is the share of persons whose 20-attribute tuple repeats inside the same zone; ``cross-zone clone'' is the share of an arm's distinct tuples that appear in more than one zone. The unseen share is the person-weighted share of persons whose tuple is absent from the pool's microdata-sourced records; that reference is not the donor file of the raw-microdata arms, which resample the census seed verbatim and are 0\% by construction, so a non-zero entry for either raw arm would indicate a reference mismatch rather than construction. Joint TVD is the mean over the eight designed pairs of the distance between each arm's pooled joint distribution and the \emph{microdata-only} joint reference; ``Resolved'' is the share of those pairs with TVD at most 0.1. CP-MIP's high duplication is a property of the method, not of the cap: it reuses a small set of constraint-feasible household templates inside each zone, which is how it meets the control tables while keeping cross-zone cloning low. Its resolved share comes from tolerance relaxation in that build; across its 453 fittable zones the worst cell of the median zone misses by a factor of 10.5 and no zone comes within 5\% on every cell.}
-
-The audit does not support a claim that any arm dominates, and the three criteria point in different directions. On Panel A's 213-zone cohort, SA-Only attains the lowest mean joint TVD (0.133, against 0.172 for IPU-Only and 0.179 for CP-MIP) and resolves half the eight designed pairs (50\%, against 37.5\% for CP-MIP and 12.5\% for IPU-Only); its mean is the closest to the microdata joint reference and its worst pair still clears the 0.1 threshold. Association structure points the other way. CP-MIP reproduces the microdata's Cram\'{e}r's $V$ substantially better (mean absolute difference 0.077, against 0.127 and 0.128 for the two raw-microdata arms), a difference of roughly 1.6-fold, and it carries by far the largest unseen share (75.7\% against 0\% for both raw arms) at the lowest cross-zone cloning (38.7\% against 63.5\% and 72.9\%). That advantage is bought with duplication: it repeats the same attribute combination inside a zone for 89.5\% of persons, so its diversity is a property of a small template set rather than of a larger supply of distinct households. On the 11-zone cohort, CP-pool+SA reverses the cloning ordering (36.2\%, the lowest of any arm) and carries the largest unseen share (86.9\%), but its mean association deviation is 0.098 and it resolves none of the designed pairs, consistent with a pool that is feasible by construction but not optimised for joint fidelity.
-
-The defensible conclusion is conditional, not universal. A candidate pool that is feasible by construction and cell-complete improves marginal fit under a conventional fitter and removes the structural-violation failure mode entirely, while leaving the joint-structure and diversity trade-offs to be selected by the design of the pool rather than by the fitter. A high unseen share is not sufficient for joint fidelity---CP-MIP reaches 75.7\% while duplicating nine records in ten---but neither is marginal fidelity sufficient on its own, since the arm that fits marginals best is also the one that departs most from the microdata joint reference. That is the case for adding expansion as a pool-side control rather than for replacing the fitter.
 
 \FloatBarrier
 
 \subsection{Simulated Annealing fitting}
 \label{sec:saextended}
 \label{sec:sa}
-The \gls{sa} algorithm runs 1{,}000 iterations per zone ($T_0=100$, $\alpha=0.95$, RSSZ objective). Each iteration proposes one of two move types: a \emph{household move} (adding, removing, or swapping whole households from the pool) or a constraint-safe \emph{attribute mutation} that re-labels an individual's control attribute---or a whole family's dwelling attributes (VEHRD, STRD)---from the most over-represented to the most under-represented census category. Mutations are census-safe by construction: age-gated attributes are edited only for adults and only among ``applicable'' categories, so the child not-applicable rules cannot be violated, and family mutations apply one value to every member. As a by-product, an edited record is no longer a verbatim microdata row, contributing to the unseen share and to cross-zone diversity. The Metropolis acceptance rule uses the standard temperature schedule $\exp(-\Delta\text{RSSZ}/T)$; the tolerance $\text{tol}_{k,m}=0.05$ is a \emph{convergence/reporting threshold only} and does not enter the acceptance rule.
+The \gls{sa} algorithm runs 1{,}000 iterations per zone. The initial temperature is auto-calibrated to the measured cost scale (about $10^{-4}$) and $\alpha=0.95$, raised to 0.995 when 0.95 would cool too aggressively. Each iteration proposes one of two move types: a \emph{household move} (adding, removing, or swapping whole households from the pool) or a constraint-safe \emph{attribute mutation} that re-labels an individual's control attribute, or a whole family's dwelling attributes (VEHRD, STRD), from the most over-represented to the most under-represented census category. Mutations are census-safe by construction: age-gated attributes are edited only for adults and only among ``applicable'' categories, so the child not-applicable rules cannot be violated, and family mutations apply one value to every member. As a by-product, an edited record is no longer a verbatim microdata row, contributing to the unseen share and to cross-zone diversity. The Metropolis acceptance rule uses the standard temperature schedule $\exp(-\Delta\text{RSSZ}/T)$; the tolerance $\text{tol}_{k,m}=0.05$ is a \emph{convergence/reporting threshold only} and does not enter the acceptance rule. Only the retained best is monotone: the current solution can move uphill even when the best does not.
 
 Attribute mutation is the one place in the SA path where a move could in principle leave the feasible set, and it is bounded so that it cannot: the re-labelling is restricted to applicable categories for the person's age, and a family move assigns a single value to every member. The CP route makes this explicit rather than relying on the move set, because its records are constructed inside the rule set before any fit begins.
 
+Figure~\ref{fig:sa_convergence} separates convergence from final fit. For zone 301011004, SA-Only begins at a best RSSZ of 0.30 and is essentially flat after 200 iterations, whereas MIP current begins at 0.76 and continues to 0.67 by iteration 1{,}000; the coverage-only and composition-aware runs begin higher on the 19-table objective, at 0.23 and 1.00 respectively. Over the 290 zones common to the runs, the median SA-Only run is within 5\% of its final value by iteration 200, while the median MIP current run is still 28\% above its final value at that point and 13\% above at iteration 600. The MIP pool therefore begins from a worse incumbent and leaves more of the fit to the search budget; raw SA converges early but from a better starting point. The composition-aware run's higher 19-table trace reflects tables outside the 11-table reporting basis; it is the marginal result in Table~\ref{tab:expansion_composition} that improves. This is a convergence contrast, not a claim that more iterations close the gap: the tail test above shows that four of the five worst MIP+SA zones improve with a longer seeded run, while the pathological zone does not.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_sa_convergence.png}
+\caption{Convergence rather than final fit. \textbf{(a)} Best RSSZ for zone
+301011004 at the 200-iteration checkpoints under SA-Only, the current MIP pool,
+the coverage-only MIP pool and the composition-aware MIP pool, on a log scale.
+\textbf{(b)} The same checkpoints over the 290 zones common to the runs; each
+zone's best RSSZ is divided by its own value at iteration 1{,}000, and the
+lines and bands are the median and interquartile range. Values are the 19-table
+RSSZ used by the fitting objective, not the 11-table reporting metric.}
+\label{fig:sa_convergence}
+\end{figure}
+
 \section{Conclusion}
-What is reported here is a constraint-first, integrated pipeline for synthetic population generation: a candidate pool constructed from census conditionals under eleven structural rules, a mixed-integer expansion that restores zero-capacity cells with rule-feasible donor--shell households, greedy household reconstruction, and \gls{sa}/\gls{ipu} zone fitting, applied to a 457-zone case study in South-East Queensland and the Tweed of which 453 zones are fitted by the SA and constructed-pool arms, and released with code, data-preparation decisions, and job logs so that every reported number can be regenerated from a single run.
+What is reported here is a constraint-first, integrated pipeline for synthetic population generation: a candidate pool constructed from census conditionals under eleven structural rules, a mixed-integer expansion that restores zero-capacity cells with rule-feasible donor--shell households, household-atomic construction from donor households and census shells, and \gls{sa}/\gls{ipu} zone fitting, applied to a 371-zone case study in South-East Queensland and the Tweed of which 367 zones carry a census population and are fitted and scored by every arm, and released with code, data-preparation decisions, and job logs so that every reported number can be regenerated from a single run.
 
-Three substantive findings are reported. First, the pool is the binding stage: on the 11 control tables every completed arm carries, the constructed feasible pool lowers SA's mean RSSZ from 0.416 to 0.205 and its median from 0.276 to 0.188 over the identical 353-zone cohort, with the fitter, its iteration budget and its acceptance rule held fixed. A feasible, cell-complete candidate pool therefore improves marginal fit without any learned generative component, which is what the construction-first argument predicts and what a repair-based pipeline cannot test. Second, feasibility of individual records does not imply zone-level fit: over the 453 fittable zones the mixed-integer fitter misses the worst cell of the median zone by a factor of 10.5 and its typical cell by 18\%, the best zone by 0.57, and no zone comes within 5\% on every cell, so a tolerance-relaxed program measures the inconsistency of the control tables rather than replacing the fitter. Third, the expansion mechanism removes the blockage it targets: across ten audit zones it covered 70 of the 73 sourceable zero-capacity cells with 14 households (18 persons), left uncovered only cells the census extract cannot source, and introduced no new constraint violations.
+Two substantive findings are reported. First, the pool binds the outcome: over the identical 367-zone cohort and the 11 control tables every arm carries, the constructed feasible pool lowers IPU's mean RSSZ from 0.435 to 0.324 under CP-only and 0.315 under MIP, and the composition-controlled variant reaches 0.302; the median falls from 0.275 to 0.193. For SA, CP-only scores 0.285, MIP 0.511, and the composition-controlled MIP variant 0.250 against SA-Only's 0.247. A feasible, cell-complete candidate pool therefore improves marginal fit without any learned generative component, which is what the construction-first argument predicts and what a repair-based pipeline cannot test. Second, the expansion mechanism removes the blockage it targets: across \ExpZones{} audited zones it covered \ExpCoveredCells{} of \ExpZeroCells{} zero-capacity cells (\ExpCoverPct\%) with a coverage set of \ExpAddedHouseholds{} households (\ExpAddedPersons{} persons), the released pool adds 19{,}325 households (67{,}475 persons) in total, every one of the \ExpUncoveredCells{} cells it left uncovered lies in a code the extract cannot source, and no added household violates the structural rules.
 
-The cohort-matched audit qualifies these marginal-fit results. No arm dominates: SA-Only attains the lowest mean joint TVD (0.133) and resolves half the designed pairs, CP-MIP reproduces the microdata's pairwise associations most closely (mean absolute Cram\'{e}r's $V$ difference 0.077) while duplicating 89.5\% of records within a zone, and CP-pool+SA has the least cross-zone cloning (36.2\%) and the largest unseen share (86.9\%) but resolves none of the designed pairs. The result is therefore an integration whose gains are spread across criteria---marginal fit and structural validity to construction, association preservation to constraint-optimised selection, diversity to the constructed pool---without dominance on any single one. The pool-side argument is also the paper's main open experiment: the two expanded-pool arms are implemented and specified, the mechanism that they depend on has been audited, and their fitted-zone metrics have not yet been measured.
+The result is an integration in which the candidate pool, not the fitter alone, sets the attainable marginal fit: a pool that is feasible and cell-complete helps the weight-only fitter, and a composition-controlled constructed pool also matches SA-Only while improving its median. The MIP append's SA penalty is attributable to its appended-record composition, not to SA on a constructed pool. The pool-side argument is now measured for the CP-only, MIP, coverage-only and composition-aware arms; the 2000-donor build remains in progress and is not credited with a result.
 
-Limitations. (i) Greedy household matching is a heuristic whose output is not validated against household-level ground truth; this is the least controlled stage. (ii) The CP-pool+SA versus SA-Only comparison confounds feasibility with pool size and composition, so it identifies the constructed pool as a whole rather than the feasibility property alone. (iii) Cohort sizes and output caps differ by analysis; \cref{tab:cohorts} lists every cohort with its size, its arms and the metric computed on it, so no figure here is read against a cohort it was not computed on, but a fully matched all-arm cohort remains future work. (iv) The expanded-pool arms (MIP+SA, MIP+IPU) are not yet measured; the refit is blocked by a seeding defect in the current harness, documented in the released run notes, which doubles the individual universe for a subset of zones and would make any fitted figure a property of the harness rather than the pool. (v) CP-MIP is incomplete in a different sense: it solves the 453 fittable zones, but the constructed-pool arms have not yet been evaluated on the broader validation basis recorded in Appendix~\ref{sec:appendix_available_validation}. (vi) The PopulationSim/POLARIS comparison protocol is specified in Section~\ref{sec:external_baselines}, but those external runs have not been completed on the Australian control schema; consequently no external method is claimed to outperform or underperform the present pipeline. A direct comparison against external baselines such as BN+IPF \citep{Ilahi2019IntegratingJakarta} remains an important next experiment. (vii) The pool-expansion audit in Appendix~\ref{sec:pool_expansion_audit} establishes operational viability on ten zones, not that each emitted record is realised in the census; cells absent from the census and padding codes remain unfilled. (viii) A qalfp coding offset between the CP route and the raw arms is exposed by a single config switch and has not been harmonised across all reported tables, so qalfp figures are comparable within an arm but not yet across the CP--raw boundary.
+Limitations. (i) The pool's household provenance, whole-household copies and donor--shell grafts of observed census households, is not validated against household-level ground truth beyond the census size distribution it inherits; this is the least controlled aspect of the construction. (ii) The CP-only+SA versus SA-Only comparison confounds feasibility with pool size and composition, so it identifies the constructed pool as a whole rather than the feasibility property alone. On the corrected 367-zone refit, CP-only+SA scores 0.285 and CP-only+IPU 0.324; MIP+SA scores 0.511 and MIP+IPU 0.315. The composition-controlled MIP variants score 0.250 and 0.158 under SA and 0.302 and 0.196 under IPU. The SA penalty therefore belongs to the MIP append, not to SA on a constructed pool at all. The clean pool effect is read from CP-only+IPU against IPU-Only, and from CP-only+SA against SA-Only; the composition-controlled arms are reported separately because they add a post-hoc filter. (iii) Cohort sizes and output caps differ by analysis; \cref{tab:cohorts} lists every cohort with its size, its arms and the metric computed on it, so no figure here is read against a cohort it was not computed on, but a fully matched all-arm cohort remains future work. (iv) The 2000-donor/32-shell build is still running and is not reported; the measured arms use the 300-donor menu and the current MIP expansion. An earlier seeding fault of a different kind, a dwelling-count cap intended to trigger only for zones with fewer than 50 dwellings but actually firing on almost every zone and underfilling their populations, has been corrected, and every zone reported here is re-fitted under the corrected threshold. (v) The PopulationSim/POLARIS comparison protocol is specified in Section~\ref{sec:external_baselines}, but those external runs have not been completed on the Australian control schema; consequently no external method is claimed to outperform or underperform the present pipeline. A direct comparison against external baselines remains an important next experiment. (vi) The pool-expansion audit in Appendix~\ref{sec:pool_expansion_audit} establishes operational viability on \ExpZones{} zones, not that each emitted record is realised in the census; cells absent from the census and padding codes remain unfilled. (vii) A qalfp coding offset between the CP route and the raw arms is exposed by a single config switch and has not been harmonised across all reported tables, so qalfp figures are comparable within an arm but not yet across the CP--raw boundary.
 
 \section*{Supplementary Material}
 Computational resources and the full hyperparameter table are in the supplementary material.
 
 \section{Data Availability}
-The data and code are available from \url{https://github.com/zahern/Pop_Synth_GANSA}.
+The data and code are available from \url{https://github.com/zahern/Pop_Synth_Cell}.
 
 \newpage
 \section*{Appendix}
@@ -652,7 +869,7 @@ The filtering function $f(I)$ used with \cref{eq:marginal_tolerance} determines 
 \[
 f(I) = \begin{cases} 1 & \text{if } \bigwedge_{j=1}^{m} R_j(I) \text{ is satisfied}, \\ 0 & \text{otherwise}, \end{cases}
 \]
-where $\mathcal{R}=\{R_1,\dots,R_m\}$ is the set of $m$ rules and each $R_j$ specifies a condition an individual with characteristics $I$ must satisfy. The following 11 logical constraints---derived from the ABS Census Dictionary---constitute $\mathcal{R}$:
+where $\mathcal{R}=\{R_1,\dots,R_m\}$ is the set of $m$ rules and each $R_j$ specifies a condition an individual with characteristics $I$ must satisfy. The following 11 logical constraints, derived from the ABS Census Dictionary, constitute $\mathcal{R}$:
 
 \begin{enumerate}[label=\textbf{R\arabic*}, ref=R\arabic*, leftmargin=*]
     \item \textbf{Child employment:} if AGEP $<$ 15, EMPP must be ``not applicable''.
@@ -670,68 +887,199 @@ where $\mathcal{R}=\{R_1,\dots,R_m\}$ is the set of $m$ rules and each $R_j$ spe
 
 These rules are implemented once, as predicates, and applied at two points: when the feasible pool is constructed, and as forbidden-pair cuts in the expansion program. They encode \emph{structural impossibility} from the census dictionary, not distributional knowledge; the distributional structure comes from the observed conditional distributions of the microdata, which the construction samplers preserve by drawing each attribute from its observed conditional given the shell's fixed terms.
 
-\subsection{Reconstructing Households}
+\subsection{Household Assembly in the Pool}
 \label{sec:household_appendix}
-Each candidate record retains household-level and individual-level attributes. Algorithm~\ref{alg:table} groups individuals into households. Because a full optimal assignment (e.g.\ the Hungarian algorithm) is $O(n^3)$ and intractable for millions of records, a greedy seed followed by a joint local-search refinement is used. The refinement scores family and household terms together: person-level compatibility (age, relationship, family size, and children) is combined with dwelling-level consistency (household composition, persons, bedrooms, tenure, rent, mortgage, vehicles, and structure). A swap is accepted only on the combined score, so the two levels are not fitted as independent post-processing steps. The procedure remains a heuristic and is not claimed to find a global optimum.
-For reproducibility, the implementation writes
-a per-term household audit table after refinement. This reports, for
-each household term present in the pool, the fraction of reconstructed households
-whose members share that term; it is a diagnostic of the reconstruction stage, not a
-claim of ground-truth household recovery.
+Every record in a reported pool carries a household identity before any fit
+begins, and the zone fitters select whole households by that identity, so
+household assembly is a property of pool construction rather than a separate
+post-hoc step. Algorithm~\ref{alg:table} states how the constructed pool
+obtains the households it carries. Observed census households are kept with their
+original \texttt{ABSHID}. A thin cell is filled by drawing a donor household that
+carries the cell, keeping all its members under a fresh \texttt{ABSHID}, writing
+the cell's household-level values on every member and its person-level values on
+the anchor member. Where a control cell has no carrier, coverage first
+prefers a whole observed household that carries the cell, copied under a fresh
+identifier with only the targeted attribute set, within the members' feasible
+set; if no observed household carries it, one feasible household is patched (a
+single member for a person-level attribute, every member for a dwelling-level
+attribute) and copied under a new identifier. Expansion households are
+donor--shell grafts: a donor person profile is placed into a real census
+household shell whose dwelling terms are fixed, and the result is retained only
+if it satisfies the structural rules. Each keeps a real household's composition: the infill and the copy retain an
+observed household's members, and the graft retains the shell's. The infill's
+household-level fields are the target cell's rather than the donor's, which is
+what makes the drawn household cover the cell, while the copy and the graft
+carry an observed dwelling's terms. The assembled households are therefore
+atomic by construction, and the pool's household-size distribution is the
+census's rather than a reassembled one.
 
-\begin{algorithm}
-\caption{Greedy Sequential Household Matching (with household-type pre-partitioning)}
+\begin{algorithm}[H]
+\caption{Household assembly in the constructed pool}
 \begin{algorithmic}[1]
-\Require Individuals $I$; compatibility score $\text{score}(q,h)$
-\Ensure Household pool $H$
-\State Partition $I$ into buckets $\{B_1,\dots,B_T\}$ by household type
-\State $H \gets \emptyset$
-\For{each bucket $B_t$}
-    \While{$B_t \neq \emptyset$}
-        \State Select first individual $p$ from $B_t$; initialise household $h \gets \{p\}$; determine target size $s$
-        \State Sort $B_t\setminus\{p\}$ descending by $\text{score}(q,h)$
-        \For{each $q$ in sorted order}
-            \If{$q$ satisfies household constraints and $|h| < s$} add $q$ to $h$ \EndIf
-        \EndFor
-        \State $H \gets H \cup \{h\}$; remove $h$ from $B_t$
-    \EndWhile
+\Require observed census records with \texttt{ABSHID}; thin and uncovered control cells; expansion donor profiles and census shells
+\Ensure a pool in which every record carries a household identity and every household is atomic
+\State Keep every observed census household with its original \texttt{ABSHID}
+\Statex \textbf{Thin-cell infill (per thin cell below the carrier minimum)}
+\For{each thin cell}
+    \State Draw a donor row carrying the cell and take its whole census household
+    \State Write a fresh \texttt{ABSHID}; set the cell's household-level fields on every member
+    \State Set the cell's person-level fields on the anchor member
 \EndFor
-\State \Return $H$
+\Statex \textbf{Coverage copy (per uncovered control cell $(k,m)$)}
+\For{each cell $(k,m)$ with a positive target and no carrier in the pool}
+    \If{some observed household carries $(k,m)$, is rule-feasible and not oversized}
+        \State Copy that whole household under a fresh \texttt{ABSHID}; set only the targeted attribute, within the members' feasible set
+    \Else
+        \State Patch one feasible household: a single member for a person-level cell, every member for a dwelling-level cell; copy it under a fresh \texttt{ABSHID}
+    \EndIf
+\EndFor
+\Statex \textbf{Expansion graft (per zero-capacity cell in a zone's slice)}
+\For{each zero-capacity cell}
+    \State Graft the donor person profile onto a real census shell with the shell's dwelling terms fixed
+    \State Emit the household only if it satisfies the structural rules $\mathcal{R}$; otherwise try another shell
+\EndFor
+\State \Return the pool with its assembled households
 \end{algorithmic}
 \label{alg:table}
 \end{algorithm}
 
+
 \input{files/pool_expansion_appendix3.tex}
+
+\subsection{Per-table marginal diagnostics}
+\label{sec:appendix_marginals}
+Figure~\ref{fig:marginals_all_tables} reports, for every in-sample control table, the
+total-variation distance between the pooled census marginal and the pooled marginal of each
+arm on the 60-zone cohort on which all four arms are available. The distance is computed
+from the category shares, not as a mean of per-zone RSSZ, so it describes the shape of the
+cohort-level distribution and is not a substitute for the zone-level results. The largest
+pooled discrepancy is \texttt{qalfp}, which is the coding offset between the raw and
+constructed-pool routes discussed in the caption of Figure~\ref{fig:pool_gain_ipu};
+\texttt{rlhp} and \texttt{hind} follow. Apart from those three, every table is below 0.2
+for every arm. Category-level panels for all nineteen tables are released with the
+replication package under \texttt{outputs/paper\_figures/}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_marginals_all_tables.png}
+\caption{Total-variation distance between the pooled census marginal and each arm's pooled
+marginal, by in-sample control table, on the 60-zone cohort. Lower is better. The census is
+the zero baseline and is not drawn. \texttt{qalfp} is dominated by the coding offset
+between the raw and constructed-pool routes: the raw arms place the modal category at a
+different code, so their distance is near 0.5 even though the remaining categories are
+close.}
+\label{fig:marginals_all_tables}
+\end{figure}
 
 \subsection{Available broader validation}
 \label{sec:appendix_available_validation}
 The main text reports only the 11 control tables shared by the completed arms.
-For transparency, the following records the broader validation that is currently
-available for the two raw-microdata arms. It is not used in the primary comparison
-and should not be interpreted as evidence that the constructed-pool arms have been
-validated on the same basis. The reported values cover 19 in-sample tables and
-seven held-out tables over the available 354-zone cohort.
+For transparency, the following records the held-out validation for all four arms on the
+367-zone cohort they share. It is not used in the primary comparison. The table below
+reports the seven held-out control tables. Figure~\ref{fig:heldout_tvd} summarises the six
+tables every arm supports, and Figures~\ref{fig:heldout_categories_person}--
+\ref{fig:heldout_categories_household} show the category-level comparison for all seven,
+one panel per table. Categories below 0.05\% of every series are omitted from the panels
+but remain in the table. Three measurement defects in the earlier held-out pass are repaired
+here: the \texttt{age5p} control labels had been flattened to band lower bounds, the
+\texttt{tenlld} ``Not applicable'' text had not been aligned with population code 9, and
+dwelling-level tables were counted once per person rather than once per household. The
+last correction matters because the synthetic populations repeat dwelling attributes on
+every member row.
+
 
 \begin{table}[h!]
 \centering
-\caption{Available broader validation for the raw-microdata arms. These values are
-reported in the appendix only; the primary manuscript comparison uses the 11 shared
-tables in \cref{tab:pool_fitter_matrix}.}
-\label{tab:appendix_available_validation}
-\begin{tabular}{@{}lrrrrr@{}}
+\caption{Held-out performance by table for all four arms on the 367-zone matched cohort
+(\texttt{lfsp}: 259 zones, the SA2s whose control table carries labour-force status).
+Entries are mean per-zone total-variation distance; lower is better. These are marginal
+concordances for structures the fitter never optimised against: the seven tables were
+excluded from the fitting basis by design, so agreement here measures structure that
+survives a fit rather than structure that was targeted. The raw populations do not carry
+\texttt{families\_in\_household}, so \texttt{hcfmf} is reported for the two
+constructed-pool arms only.}
+\label{tab:heldout}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{Method} & \textbf{Zones} & \textbf{Pairs} & \textbf{TVD median} &
-\textbf{TVD mean} & \textbf{SRMSE mean} \\
+\textbf{Held-out table} & \textbf{SA-Only} & \textbf{IPU-Only} & \textbf{CP-SA} & \textbf{CP-IPU} \\
 \midrule
-SA-Only  & 354 & 9,204 & 0.500 & 0.367 & 40.7 \\
-IPU-Only & 354 & 9,204 & 0.500 & 0.374 & 54.3 \\
+age5p (age by 5-year group)          & 0.109 & 0.146 & 0.130 & 0.140 \\
+assnp (need for assistance)          & 0.038 & 0.047 & 0.038 & 0.040 \\
+bedrd (bedrooms)                     & 0.223 & 0.235 & 0.222 & 0.233 \\
+hcfmf (family composition)           & n/a   & n/a   & 0.040 & 0.057 \\
+hhcd (household composition)         & 0.144 & 0.190 & 0.140 & 0.197 \\
+lfsp (labour force status)           & 0.341 & 0.387 & 0.350 & 0.388 \\
+tenlld (landlord type)               & 0.181 & 0.190 & 0.176 & 0.182 \\
 \bottomrule
 \end{tabular}
+
+\par\smallskip
+{\footnotesize\textit{Note:} The matched cohort is the 367 SA2 zones on which all four
+arms produced a population; \texttt{lfsp} is scored on the 259 of those whose SA2 control
+table carries labour-force status. The two raw arms lack \texttt{families\_in\_household}, so the
+\texttt{hcfmf} row has no raw-arm entries; the constructed-pool arms do carry the source
+column. \texttt{age5p} was previously reported at 1.000 because the control table's labels
+were flattened to band lower bounds; mapping them back to the five-year labels and deriving
+the synthetic side from \texttt{agep} yields the values above. \texttt{tenlld} aligns the
+control table's ``Not applicable'' text with population code 9. Dwelling-level tables
+(\texttt{bedrd}, \texttt{hcfmf}, \texttt{hhcd}, \texttt{tenlld}) are counted once per
+household; an earlier pass counted one row per person, which repeated each dwelling
+attribute once per member and inflated the affected distances.}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_heldout_tvd.png}
+\caption{Mean held-out total-variation distance for the six held-out tables every arm
+supports, on the 367-zone matched cohort (\texttt{lfsp}: 259 zones). Lower is better. \texttt{hcfmf} is excluded
+because the two raw populations do not carry \texttt{families\_in\_household}; its
+constructed-pool values are in Table~\ref{tab:heldout} and its category panel is in
+Figure~\ref{fig:heldout_categories_dwelling}(b).}
+\label{fig:heldout_tvd}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_heldout_categories_person.png}
+\caption{Category-level held-out marginals for the person-carried control tables, pooled
+over the matched cohort. Each category shows the census target (grey) followed by SA-Only,
+IPU-Only, CP-pool+SA and CP-pool+IPU. (a) Age bands follow the ABS five-year groups
+and are labelled by their bounds. (b) Need-for-assistance categories are the ABS census
+codes. (c) Labour-force status is shown on the 260 zones whose SA2 control table carries
+it. A level set of bars reproduces the marginal; the aggregate distances are in
+Table~\ref{tab:heldout}.}
+\label{fig:heldout_categories_person}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_heldout_categories_dwelling.png}
+\caption{Held-out category profiles for the dwelling and family-composition tables.
+(a) Bedrooms. (b) Family household composition. The two raw populations do not carry
+\texttt{families\_in\_household}, so panel (b) shows the census and the two
+constructed-pool arms only; the legend lists all four arms because panel (a) uses them.}
+\label{fig:heldout_categories_dwelling}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_heldout_categories_household.png}
+\caption{Held-out category profiles for the household tables. (a) Household composition.
+(b) Landlord type, where the x-axis shows the ABS census category codes and category 9 is
+``Not applicable''. Both panels are drawn for the census and all four arms on the 367-zone
+matched cohort.}
+\label{fig:heldout_categories_household}
+\end{figure}
+
+\FloatBarrier
 
 \subsection{RSSZ Outlier Zone Analysis}
 \label{sec:outlier_zones}
-Elevated RSSZ values for certain control tables arise from zones with sparse dwelling counts. The SA algorithm seeds its initial solution from \emph{individual-level} control totals, while \emph{household-level} tables report far fewer dwellings; this mismatch causes the SA to start with an overfilled population containing extraneous households that cannot be reduced to match household-level marginals within the iteration budget. A guard was intended---cap the initial solution to the household-level total when a zone has fewer than 50 dwellings---but an earlier implementation tested only ``household total $<$ individual total'', which is true for essentially every zone, systematically underfilling populations. This was corrected by restoring the $<$50-dwelling threshold and every reported zone was re-fitted under the corrected code. After the correction, the great majority of zones fall below the RSSZ$>$2.0 outlier threshold; among the residual outliers, household-level tables remain the dominant contributors, while individual-level tables contribute far fewer.
+Elevated RSSZ values for certain control tables arise from zones with sparse dwelling counts. The SA algorithm seeds its initial solution from \emph{individual-level} control totals, while \emph{household-level} tables report far fewer dwellings; this mismatch causes the SA to start with an overfilled population containing extraneous households that cannot be reduced to match household-level marginals within the iteration budget. A guard was intended: cap the initial solution to the household-level total when a zone has fewer than 50 dwellings, but an earlier implementation tested only ``household total $<$ individual total'', which is true for essentially every zone, systematically underfilling populations. This was corrected by restoring the $<$50-dwelling threshold and every reported zone was re-fitted under the corrected code. After the correction, 36 of the 371 zones in the scope cohort (9.7\%) still exceed a total RSSZ of 2.0, so 90.3\% fall below it; those thirty-six average 6.56 against 0.68 for the rest. The threshold applies to the zone total summed over the 29 control tables of the outlier scan, not to the per-table values in the results tables, which are computed on the 11 shared tables. Within the thirty-six, household-level tables supply 5.18 of the 6.56 (79\%), led by \texttt{vehrd} (3.81) and \texttt{strd} (1.07); person-carried tables supply 1.39, of which \texttt{tenlld} (0.84) is the largest. Across all 371 zones the two groups are level (0.62 each), so the imbalance belongs to the tail rather than to the fit as a whole; \texttt{tenlld} is the exception, exceeding its even share of the threshold (2/29 = 0.07) in 365 of 371 zones, so it contributes almost everywhere rather than specifically in the outliers.
+
+
 
 \newpage
 \FloatBarrier
@@ -740,3 +1088,4 @@ Elevated RSSZ values for certain control tables arise from zones with sparse dwe
 \bibliography{references}
 
 \end{document}
+

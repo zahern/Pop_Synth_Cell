@@ -1,0 +1,71 @@
+\subsection{Composition control in expansion}
+\label{sec:expansion_composition}
+The mixed-integer program in Section~\ref{sec:mip_expansion_formulation}
+optimises coverage and marginal composition jointly, but only over the support
+set it selects. To expose the distinction, a 300-donor, 32-shell build was
+produced with the full menu appended (\texttt{--append-menu-candidates}); it is
+the full-menu stress case in Table~\ref{tab:expansion_composition}. In that
+build, the selected set contributes
+2.9\% of the added persons; the other 97.1\% come from appending the remaining
+candidate menu after the solve. The appended
+records are not part of the admission vector $y$, are not in the deviation terms
+$d_{k,m}$, and are not subject to the composition tie-break. The result is a
+pool that is cell-complete but compositionally skewed: the 300-donor build has
+8.7\% size-7 households and 6.9\% \texttt{mtwp} code 17 (``Not stated''),
+against 5.0\% and 0.0\% in the current pool.
+
+Two composition-controlled variants were built from the same shards, without
+rerunning the MIP. The \emph{coverage-only} variant keeps the selected support
+set and drops the appended menu. The \emph{composition-aware} variant keeps the
+base pool, the selected set and only those appended households that are neither
+size 7 nor contain \texttt{mtwp} code 17. The implementation also exposes a
+composition-weight multiplier, optional size-7/\texttt{mtwp} caps and a
+minimum-admitted-household lower bound; hard caps alone can starve coverage (a
+test with a 1\% \texttt{mtwp} cap selected only one household), so the reported
+variants use the two filters above. Table~\ref{tab:expansion_composition}
+reports their composition and fitted RSSZ.
+
+\begin{table}[h!]
+\centering
+\caption{Composition and fit of the expansion variants. Size-7 is the share
+of households; \texttt{mtwp} 17 is the share of persons in the ``Not stated''
+travel category. The fitted columns are 11-table RSSZ on the 367-zone fitted
+cohort.}
+\label{tab:expansion_composition}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lrrrrrrrr@{}}
+\toprule
+Variant & Persons & Households & Size-7 & \texttt{mtwp} 17 & SA mean & SA med. & IPU mean & IPU med. \\
+\midrule
+Current MIP-expanded pool & 1{,}463{,}817 & 569{,}024 & 5.6\% & 1.5\% & 0.511 & 0.295 & 0.315 & 0.193 \\
+300-donor full-menu MIP & 1{,}879{,}051 & 732{,}537 & 8.7\% & 6.9\% & 1.822 & 1.168 & 1.127 & 0.789 \\
+300-donor, coverage-only & 1{,}410{,}278 & 554{,}423 & 5.1\% & 0.5\% & 0.329 & 0.177 & 0.335 & 0.214 \\
+300-donor, composition-aware & 1{,}609{,}883 & 624{,}912 & 4.5\% & 0.5\% & 0.250 & 0.158 & 0.302 & 0.196 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+The composition-controlled variants therefore separate the two questions the
+300-donor full-menu build conflated: whether expansion covers the zero-capacity cells, and
+whether the added records preserve the census composition. The coverage-only
+variant answers the first while removing the second's skew; the
+composition-aware variant asks whether a larger pool can be added without
+importing the not-stated and size-7 surplus.
+
+The fitted result identifies the mechanism. On the 367-zone cohort, the
+composition-aware pool scores an SA mean and median of 0.250 and 0.158, and an
+IPU mean and median of 0.302 and 0.196. The current MIP-expanded pool scores
+0.511 and 0.295 under SA and 0.315 and 0.193 under IPU; the 300-donor full-menu
+build scores 1.822 and 1.168 under SA and 1.127 and 0.789 under IPU; SA-Only
+scores 0.247 and 0.233, and IPU-Only 0.435 and 0.275. The composition-controlled
+pool therefore removes the SA penalty: its SA mean is within 0.003 of SA-Only
+while its median is 0.075 lower. Under IPU it lowers the mean from 0.315 to
+0.302, although the median is essentially unchanged (0.193 to 0.196). The
+coverage-only pool scores 0.329 and 0.177 under SA, and 0.335 and 0.214 under
+IPU; it also recovers most of the penalty, but the composition-aware append
+keeps substantially more candidates at the same composition. The difference between the two controlled
+variants is therefore pool size, not composition: both remove the
+appended-menu skew.

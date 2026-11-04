@@ -1,0 +1,45 @@
+\subsection{Joint and diversity audit}
+\label{sec:full_audit}
+Table~\ref{tab:full_audit} reports the joint and diversity audit for the eight
+completed expansion arms on the same 367 fitted zones. Joint TVD is the mean
+per-zone total-variation distance over the eight designed attribute pairs;
+$|\Delta V|$ is the mean absolute difference in Cram\'{e}r's $V$ on those pairs;
+identical persons are persons whose 20-attribute tuple repeats inside the same
+zone; cross-zone cloning is the share of distinct tuples that appear in more
+than one zone. Lower values are better except for the marginal fit, where the
+RSSZ columns repeat the 11-table result.
+
+\begin{table}[h!]
+\centering
+\caption{Joint and diversity audit on the 367-zone fitted cohort. RSSZ is mean
+with the zone-level standard deviation in parentheses. The four right-hand
+columns are computed from the released populations; the audit is not a
+subsample.}
+\label{tab:full_audit}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Arm & RSSZ mean (SD) & Joint TVD & Mean $|\Delta V|$ & Identical persons & Cross-zone clone \\
+\midrule
+SA-Only & 0.247 (0.079) & 0.051 & 0.022 & 3.8\% & 100.0\% \\
+IPU-Only & 0.435 (1.389) & 0.136 & 0.070 & 6.5\% & 98.7\% \\
+Current MIP + SA & 0.511 (0.854) & 0.099 & 0.054 & 14.0\% & 100.0\% \\
+Current MIP + IPU & 0.315 (1.440) & 0.121 & 0.038 & 2.7\% & 56.6\% \\
+Coverage-only + SA & 0.329 (0.934) & 0.070 & 0.047 & 5.7\% & 100.0\% \\
+Coverage-only + IPU & 0.335 (1.253) & 0.123 & 0.059 & 5.9\% & 56.8\% \\
+Composition-aware + SA & 0.250 (0.748) & 0.111 & 0.062 & 36.8\% & 99.7\% \\
+Composition-aware + IPU & 0.302 (1.410) & 0.162 & 0.074 & 37.8\% & 57.5\% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+No arm dominates. SA-Only retains the lowest joint TVD and the lowest mean
+$|\Delta V|$; the current MIP IPU arm has the lowest identical-person share (2.7\%) and
+the lowest cross-zone cloning (56.6\%), at the cost of a higher marginal RSSZ.
+The composition-aware variants improve marginal RSSZ but raise within-zone
+duplication to about 37\%, so the marginal gain is not free: it is bought by
+reusing a smaller set of attribute tuples. This trade-off is reported rather
+than folded into a single ranking.

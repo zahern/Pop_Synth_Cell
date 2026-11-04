@@ -42,6 +42,25 @@ def _is_household_table(fname):
     return any(m in stem for m in _HH_MARKERS)
 
 
+# Control-table categories are decoded by CensusRecordImporter into a finer code
+# set than the populations carry, because the importer applies its raw label map
+# and never the collapsed schema used to build the pool:
+#   hrsp  'Not stated' -> 101, 'Not applicable' -> 102, 'Overseas visitor' -> 103,
+#         while the pool stores 9, 1, 10 (SA_2_level.map_hrsp_to_hrsp_m).
+#   strd  Caravan/Cabin/Improvised/attached-shop -> 9, 'Not stated' -> 4 and
+#         'Not applicable' -> 5, while the pool uses Other 4, Not stated 5,
+#         Not applicable 6.
+# Left uncorrected, every consumer reports phantom unmatched cells (hrsp:101 in
+# 364/368 zones and strd:9 in 181/368 in the 2026-11 expansion audit).  Collapse
+# once, at load, so the SA fit, the CP-MIP fit and the expansion audit all see
+# the pool's categories.  Single lookup on the original code: 9->4 must not then
+# become 5.
+_POOL_CODE_COLLAPSE = {
+    "hrsp": {101: 9, 102: 1, 103: 10},
+    "strd": {9: 4, 4: 5, 5: 6},
+}
+
+
 def _ct_to_entry(ct, key):
     """Convert a validated CensusControlTable object to the dict format
     expected by SA_2_level.build_control_dicts:
@@ -58,6 +77,11 @@ def _ct_to_entry(ct, key):
     for generic in ("1-digit", "2-digit"):
         if generic in df.columns:
             df = df.rename(columns={generic: attr})
+    collapse = _POOL_CODE_COLLAPSE.get(attr)
+    if collapse and attr in df.columns:
+        codes = pd.to_numeric(df[attr], errors="coerce")
+        df[attr] = codes.map(
+            lambda v: collapse.get(int(v), int(v)) if pd.notna(v) else v)
     keys = [c for c in df.columns if c not in (zone_col, "count")]
     # NB: control categories are NOT merged here. Merging QALFP 12+13 at load time
     # changes the scoring basis for every arm, and a paired re-score of the four
@@ -183,7 +207,7 @@ def _load_from_dir(directory):
                     ct.control_table = ct.control_table.rename(columns={_generic: _attr})
             _quiet_validate_control_table(ct)
         except Exception as exc:
-            print(f"  WARN: skipping {fname} — {exc}")
+            print(f"  WARN: skipping {fname} - {exc}")
             continue
         entry = _ct_to_entry(ct, key)
         if _is_household_table(fname):
@@ -220,7 +244,7 @@ def load_control_tables():
                 _quiet_validate_control_table(ct)
                 ind[key] = _ct_to_entry(ct, key)
             except Exception as exc:
-                print(f"  WARN: skipping {fname} — {exc}")
+                print(f"  WARN: skipping {fname} - {exc}")
         for fname in sorted(os.listdir(config.SA_CONTROL_HH)):
             if not fname.endswith(".csv") or " copy" in fname.lower():
                 continue
@@ -234,7 +258,7 @@ def load_control_tables():
                 _quiet_validate_control_table(ct)
                 hh[key] = _ct_to_entry(ct, key)
             except Exception as exc:
-                print(f"  WARN: skipping {fname} — {exc}")
+                print(f"  WARN: skipping {fname} - {exc}")
         return ind, hh
     return _load_from_dir(config.SA_CONTROL_DIR)
 
@@ -260,17 +284,21 @@ def run_sa_zone(pop, ind_tables, hh_tables, zone, max_iter, initial_temp, coolin
     # building control dictionaries. Without this, calculate_total_marginals
     # and the household objective can use different totals (notably NPRD
     # versus HHCD), producing a systematic household under-count.
+    # Only this zone is fitted, and the per-zone reconciliation is independent
+    # across zones, so restrict the pass to it. Without this the fit rescales all
+    # 368 zones for every single zone it fits, which dominated per-zone runtime.
     usable_ind, usable_hh = normalize_counts(
         usable_ind,
         usable_hh,
         audit_path=os.path.join(OUTPUT_DIR, f"zone_{zone}_control_balance_audit.csv"),
         audit_focus_zone=str(zone),
+        zones=[zone],
     )
 
     ind_dicts = build_control_dicts(usable_ind, zone)
     hh_dicts  = build_control_dicts(usable_hh,  zone)
     if sum(1 for d in ind_dicts.values() if not d) >= 2:
-        print(f"  Zone {zone}: skipped — insufficient control data")
+        print(f"  Zone {zone}: skipped - insufficient control data")
         return None, None
 
     households  = pop.groupby("abshid")
@@ -278,17 +306,75 @@ def run_sa_zone(pop, ind_tables, hh_tables, zone, max_iter, initial_temp, coolin
     total_ind, _ = calculate_total_marginals(ind_dicts, hh_dicts)
 
     if total_ind <= 0:
-        print(f"  Zone {zone}: skipped — total individual target is zero")
+        print(f"  Zone {zone}: skipped - total individual target is zero")
         return None, None
 
     solution, n = [], 0
-    while n < total_ind and remaining:
-        hh = random.choice(list(remaining)); remaining.remove(hh)
-        data = households.get_group(hh).to_dict("records")
-        solution.extend(data); n += len(data)
+    _seed_dir = os.environ.get("SA_SEED_FROM_IPU_DIR", "").strip()
+    _seeded = False
+    if _seed_dir:
+        for fname in (f"zone_{zone}_synthetic_population.csv",
+                      f"zone_{zone}.csv"):
+            path = os.path.join(_seed_dir, fname)
+            if not os.path.exists(path):
+                continue
+            try:
+                seed = pd.read_csv(path)
+            except Exception:
+                continue
+            if "abshid" not in seed.columns:
+                continue
+            ids = set(seed["abshid"].astype(str)) & set(
+                pop["abshid"].astype(str))
+            if not ids:
+                continue
+            id_map = {str(h): h for h in remaining}
+            remove = {id_map[s] for s in ids if s in id_map}
+            solution = pop[pop["abshid"].astype(str).isin(ids)].to_dict(
+                "records")
+            n = len(solution)
+            remaining -= remove
+            _seeded = True
+            print(f"  Zone {zone}: seeded from CP-IPU "
+                  f"({len(remove)} households, {n} persons)")
+            break
+
+    if not _seeded and os.environ.get("SA_SIZE_STRATIFIED", "0") not in (
+            "0", "", "false", "False"):
+        target = {}
+        for key, count in hh_dicts.get("nprd", {}).items():
+            try:
+                code = int(key[0][1])
+            except (TypeError, ValueError, IndexError):
+                continue
+            target[code] = target.get(code, 0) + int(count)
+        hh_size = households.size().to_dict()
+        by_size = {}
+        for hh, size in hh_size.items():
+            by_size.setdefault(int(size), []).append(hh)
+        for size in sorted(target, key=target.get, reverse=True):
+            if n >= total_ind:
+                break
+            avail = list(by_size.get(size, []))
+            random.shuffle(avail)
+            for hh in avail[:int(target[size])]:
+                if n >= total_ind:
+                    break
+                data = households.get_group(hh).to_dict("records")
+                solution.extend(data)
+                n += len(data)
+                remaining.discard(hh)
+        print(f"  Zone {zone}: size-stratified seed "
+              f"({n} persons, nprd targets {target})")
 
     if not solution:
-        print(f"  Zone {zone}: skipped — no feasible initial household solution")
+        while n < total_ind and remaining:
+            hh = random.choice(list(remaining)); remaining.remove(hh)
+            data = households.get_group(hh).to_dict("records")
+            solution.extend(data); n += len(data)
+
+    if not solution:
+        print(f"  Zone {zone}: skipped - no feasible initial household solution")
         return None, None
 
     active_table_count = len(ind_dicts) + len(hh_dicts)
@@ -381,8 +467,12 @@ def run_sa_zone(pop, ind_tables, hh_tables, zone, max_iter, initial_temp, coolin
     improved_moves = 0
     stalled_iters = 0
     noop_proposals = 0
+    _record_history = os.environ.get("SA_COST_HISTORY", "0") not in ("0", "", "false", "False")
+    cost_history = [(0, float(current_cost), float(best_cost))] if _record_history else None
 
     for it in range(max_iter):
+        if cost_history is not None and it > 0:
+            cost_history.append((it, float(current_cost), float(best_cost)))
         current_hh_ids = {r["abshid"] for r in solution}
         proposal_found = False
 
@@ -479,6 +569,9 @@ def run_sa_zone(pop, ind_tables, hh_tables, zone, max_iter, initial_temp, coolin
                 f"best={best_cost:.4f}  temp={temp:.4f}  acc={acc_rate:.3f}"
             )
 
+    if cost_history is not None:
+        cost_history.append((max_iter, float(current_cost), float(best_cost)))
+
     if max_iter > 0:
         print(
             f"  Zone {zone}: accepted {accepted_moves}/{max_iter} moves; "
@@ -519,6 +612,12 @@ def run_sa_zone(pop, ind_tables, hh_tables, zone, max_iter, initial_temp, coolin
                     break
         if polish_moves:
             print(f"  Zone {zone}: polish banked {polish_moves} strictly-improving swaps; best={best_cost:.4f}")
+
+    if cost_history is not None:
+        _hist_dir = os.environ.get("SA_GAN_RESULTS_DIR", ".")
+        os.makedirs(_hist_dir, exist_ok=True)
+        pd.DataFrame(cost_history, columns=["iteration", "current_cost", "best_cost"]).to_csv(
+            os.path.join(_hist_dir, f"zone_{zone}_cost_history.csv"), index=False)
 
     rssz_total, per_table = calculate_total_rssz_table(best_sol, ind_dicts, hh_dicts)
     dominant_table = None
@@ -669,7 +768,7 @@ def main():
                 args.max_iter, args.initial_temp, args.cooling_rate,
                 objective_mode=args.objective)
         except Exception as exc:
-            print(f"  WARNING: zone {zone} skipped — SA fitting raised an error: {exc}")
+            print(f"  WARNING: zone {zone} skipped - SA fitting raised an error: {exc}")
             skipped_zones.append(zone)
             continue
 
@@ -711,7 +810,7 @@ def main():
     print(f"\nSaved: {out_path}")
     print(
         "\n[CHECK] Add the SA-Only row to Table 2 of the paper.\n"
-        "If SA-Only RSSZ ≈ SA-GAN RSSZ, most improvement comes from SA, not the GAN.\n"
+        "If SA-Only RSSZ ~ SA-GAN RSSZ, most improvement comes from SA, not the GAN.\n"
         "If SA-Only RSSZ >> SA-GAN RSSZ, the GAN's richer microdata pool is the key driver."
     )
 

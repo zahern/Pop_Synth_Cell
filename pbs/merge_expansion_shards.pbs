@@ -1,0 +1,25 @@
+#!/bin/bash -l
+#PBS -N mip_expand_merge
+#PBS -l walltime=02:00:00
+#PBS -l select=1:ncpus=1:mem=16GB
+#PBS -j oe
+#PBS -m abe
+
+# Merge append-only expansion shards into the full expanded pool.
+set -euo pipefail
+
+SYNTH_POP="${SYNTH_POP:-/home/ahernz/Paper_Plan/synth_pop}"
+CPU_ENV_NAME="${CPU_ENV_NAME:-syn_env}"
+CPU_ENV_PREFIX="${CPU_ENV_PREFIX:-/home/ahernz/miniconda3/envs}"
+PYTHON_BIN="${CPU_ENV_PREFIX}/${CPU_ENV_NAME}/bin/python"
+BASE_POOL="${BASE_POOL:?missing BASE_POOL}"
+SHARD_DIR="${SHARD_DIR:?missing SHARD_DIR}"
+OUT="${OUT:?missing OUT}"
+REPORT="${REPORT:-${OUT%.csv}.merge_report.json}"
+
+cd "$SYNTH_POP"
+"$PYTHON_BIN" -u merge_expansion_shards.py \
+  --base "$BASE_POOL" \
+  --shards "$SHARD_DIR"/shard_*.csv \
+  --out "$OUT" \
+  --report "$REPORT"

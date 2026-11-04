@@ -1,0 +1,50 @@
+\begin{longtable}{@{}llp{8.4cm}@{}}
+\caption{Control-table codes used in the paper. The 11 shared tables are the
+primary comparison basis; the additional in-sample tables enter the full
+19-table RSSZ; the held-out tables are used only for external validation.}
+\label{tab:control_codebook}\\
+\toprule
+\textbf{Code} & \textbf{Level} & \textbf{Meaning} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Code} & \textbf{Level} & \textbf{Meaning} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\multicolumn{3}{@{}l}{\emph{11 shared control tables (primary RSSZ basis)}} \\
+HEAP  & Person    & Highest educational attainment \\
+HIND  & Household & Household income (weekly) \\
+MSTP  & Person    & Registered marital status \\
+MTWP  & Person    & Method of travel to work \\
+OCCP  & Person    & Occupation \\
+RLHP  & Person    & Relationship in household \\
+SEXP  & Person    & Sex \\
+MRERD & Household & Mortgage repayment (monthly) \\
+NPRD  & Household & Number of persons usually resident in dwelling \\
+RNTRD & Household & Rent paid (weekly) \\
+VEHRD & Household & Number of motor vehicles \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Additional in-sample tables (full 19-table RSSZ)}} \\
+HRSP  & Person    & Hours worked \\
+INCP  & Person    & Total personal income (weekly) \\
+INDP  & Person    & Industry of employment \\
+QALFP & Person    & Non-school qualification: field of study \\
+QALLP & Person    & Non-school qualification: level \\
+STRD  & Household & Structure of dwelling \\
+STUP  & Person    & Full-time/part-time student status \\
+TYPP  & Person    & Type of educational institution attending \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Held-out validation tables}} \\
+AGE5P & Person    & Age in five-year groups \\
+ASSNP & Person    & Core activity need for assistance \\
+BEDRD & Household & Number of bedrooms in private dwelling \\
+HCFMF & Household & Family household composition (family) \\
+HHCD  & Household & Household composition \\
+LFSP  & Person    & Labour force status \\
+TENLLD & Household & Tenure and landlord type \\
+\end{longtable}
+
+\vspace{2pt}
+{\footnotesize Geographic fields are not control tables: \texttt{REGUCP} is the region of usual residence (SA4), and \texttt{ABSHID} is the ABS household identifier.}

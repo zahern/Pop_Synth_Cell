@@ -1,4 +1,4 @@
-% Conceptual explanation of sparse joint cells and candidate-pool expansion.
+﻿% Conceptual explanation of sparse joint cells and candidate-pool expansion.
 % Included from main_edit_rev2.tex; requires TikZ and the positioning library.
 
 \subsection{Sparse Joint Cells and Candidate-Pool Expansion}
@@ -29,7 +29,7 @@ then selects or weights candidates against the reconciled controls.
   bus/.style={line width=0.8pt, draw=black!60},
 ]
 
-%% ---- row 1: what is observed, and one expansion route -------------------
+%% , - row 1: what is observed, and one expansion route , , , , , , -
 \node[data]    (micro)   at (0.0,0)    {\textbf{Observed microdata}\\
                                         records and household IDs};
 \node[problem] (support) at (5.4,0)    {\textbf{Support gap}\\
@@ -40,7 +40,7 @@ then selects or weights candidates against the reconciled controls.
                                         learns associations and\\
                                         proposes extra candidates};
 
-%% ---- row 2: what is targeted, and the other route -----------------------
+%% , - row 2: what is targeted, and the other route , , , , , , , --
 \node[data]    (margins) at (0.0,-3.3) {\textbf{Census marginals}\\
                                         person and dwelling totals};
 \node[problem] (weights) at (5.4,-3.3) {\textbf{Reweighting limit}\\
@@ -51,20 +51,20 @@ then selects or weights candidates against the reconciled controls.
                                         builds feasible records and\\
                                         household shells from census};
 
-%% ---- merged pool --------------------------------------------------------
+%% , - merged pool , , , , , , , , , , , , , , , , , , --
 \node[result, text width=9.0cm] (pool) at (5.4,-7.2)
   {\textbf{Expanded feasible pool}\\
    observed and proposed records, grouped\\
    into whole households; each household\\
    carries its person and dwelling terms together};
 
-%% ---- fitting and validation --------------------------------------------
+%% , - fitting and validation , , , , , , , , , , , , , , --
 \node[result] (fit) at (2.6,-10.2)
   {\textbf{Joint fitting}\\ SA / IPU / MIP selection\\ against reconciled controls};
 \node[result] (validate) at (7.9,-10.2)
   {\textbf{Validation}\\ marginals, joint cells,\\ associations, feasibility};
 
-%% ---- edges --------------------------------------------------------------
+%% , - edges , , , , , , , , , , , , , , , , , , , , --
 \draw[flow] (micro) -- (support);
 \draw[flow] (support) -- (gan);
 \draw[flow] (margins) -- (weights);
@@ -100,3 +100,4 @@ candidate is retained only when it satisfies the applicable structural rules,
 household-integrity checks, and downstream marginal/joint validation. Novelty
 therefore indicates absence from the observed microdata, not empirical proof
 that a combination is absent from the population; Appendix~\ref{sec:pool_expansion_audit} reports the pool-expansion audit: how many zero cells the mechanism fills, with how many records, and which cells it cannot source.
+

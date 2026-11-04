@@ -1,4 +1,4 @@
-%% formulation_edit2.tex  -- CORRECTED formulation (revision 2)
+﻿%% formulation_edit2.tex  -- CORRECTED formulation (revision 2)
 %% Changes vs formulation_edit.tex (round-1 version), addressing Reviewer 2 (R2)
 %% and Reviewer 3 (R3):
 %%   - C1: added the missing sum over individuals; zone target renamed P_z.
@@ -59,20 +59,50 @@
 \( H_z \) & Target number of households in zone \( z \). \\ \hline
 \( O_{z,k,m} \) & Synthesized (observed) count in cell \( m \) of tabulation \( k \) for zone \( z \). \\ \hline
 \( E_{z,k,m} \) & Target (census) count in cell \( m \) of tabulation \( k \) for zone \( z \). \\ \hline
-\( \text{tol}_{k,m} \) & Fitting tolerance for cell \( m \) of tabulation \( k \): maximum relative deviation \( |O_{z,k,m}-E_{z,k,m}|/E_{z,k,m} \) permitted before a zone is deemed unfitted for that cell. A value of \( 0.05 \) permits at most 5\% deviation. Used only as a convergence/reporting threshold; it does \emph{not} enter the Metropolis acceptance rule (Section~\ref{sec:sa}). \\ \hline
+\( \text{tol}_{k,m} \) & Historical fitting tolerance for cell \( m \) of tabulation \( k \), retained only as a reporting value from the retired tolerance-constrained mode. It does \emph{not} enter the current formulation: the MIP path minimises the worst relative deviation directly (the number \( \text{tol}_{k,m} \) is therefore never supplied to the solver), and the Metropolis rule of the SA path is unaffected by it. \\ \hline
 \( \text{RSSZ} \) & Relative Sum of Squared Z-scores. \\ \hline
 \( \text{RSSZ}_z \) & RSSZ value for zone \( z \). \\ \hline
 \( \text{SSZ}_{z,k} \) & Sum of Squared Z-scores for tabulation \( k \) in zone \( z \) (the Pearson \(\chi^2\) term). \\ \hline
 \( N_k \) & Number of persons contributing to tabulation \( k \). \\ \hline
 \( C_k \) & Critical value of the \(\chi^2\) distribution for tabulation \( k \), adjusted for degrees of freedom. \\ \hline
-\( \min \frac{1}{|\mathcal{Z}|}\sum_{z} \text{RSSZ}_z \) & Objective function: minimize the mean RSSZ across zones. \\ \hline
+\( \mathbb{Z}^0_z \) & Set of zero-capacity cells for zone \( z \): cells with a positive census target but no contributing candidate in the zone's pool slice. \\ \hline
+\( \mathcal{J}_z \) & Candidate menu for zone \( z \): the pool slice plus any expansion households offered to the support block. \\ \hline
+\( \mathcal{J}_z^{+} \) & Admitted candidate set actually available to the fitter: \( \{j\in\mathcal{J}_z:y_j=1\} \) when the support block is on, and \( \mathcal{H}_z \) when it is off. \\ \hline
+\( \mathcal{H}_z \) & Candidate households available for zone \( z \): the SA4 microdata slice, \( \mathcal{H}_z \subseteq D_{a(z)} \). \\ \hline
+\( \mathcal{N}_z \) & New candidate households constructed for zone \( z \): local shells, donor profiles optionally from the wider census, each tagged to \( z \) so \( \mathcal{N}_z \) is not shared with a sibling SA2. \\ \hline
+\( \mathcal{N} \) & Pool-wide set of constructed candidates, \( \mathcal{N}=\bigcup_{z}\mathcal{N}_z \), used by the pool-support block. \\ \hline
+\( a(z) \) & SA4 region containing SA2 zone \( z \). \\ \hline
+\( \mathcal{G} \) & Set of SA4 regions; the geography map is \( a: \mathcal{Z} \to \mathcal{G} \). \\ \hline
+\( D_{a(z)} \) & Microdata sample defined once for the SA4 region \( a(z) \). \\ \hline
+\( c_{h,k,m} \) & Contribution of household \( h \) to cell \( (k,m) \): counted per person for person-level tabulations and once per dwelling for dwelling-level tabulations. \\ \hline
+\( r_{\max} \) & Replication ceiling: the maximum number of copies of a candidate household. \\ \hline
+\( \nu_{z,k,m} \) & Carrier requirement for a sample-zero cell: \( \lceil \mathrm{gap}_{z,k,m}/r_{\max}\rceil \) contribution units that must be present in the pool so replication can reach \( E_{z,k,m} \). A household contributes \( c_{h,k,m} \) units (its members in the cell, or one for a dwelling-level cell). \\ \hline
+\( \mathrm{gap}_{z,k,m} \) & Remaining capacity gap before expansion: \( E_{z,k,m} - r_{\max}\sum_{h\in\mathcal{H}_z} c_{h,k,m} \), evaluated per cell. \\ \hline
+\( s_h \) & Household size (number of persons) of candidate household \( h \). \\ \hline
+\( j \) & Index of candidate records in \( \mathcal{J}_z \). \\ \hline
+\( y_j \) & Binary support variable of the pool-support block: \( y_j=1 \) if candidate \( j \) is admitted to zone \( z \)'s candidate set. It governs pool membership, not use in the fitted population, which is \( x_{i,h} \). \\ \hline
+\( a_{j,c} \) & Contribution (persons) of candidate \( j \) to zero-capacity cell \( c \in \mathbb{Z}^0_z \). \\ \hline
+\( a_{j,k,m} \) & Contribution of candidate \( j \) to cell \( (k,m) \), counted per person for person-level tabulations and once per dwelling for dwelling-level tabulations. \\ \hline
+\( u_{j,k} \) & Membership indicator: 1 if candidate \( j \) contributes to tabulation \( k \), used to express the deviation relative to the target share \( q_{k,m} \) of its own household's tabulation. \\ \hline
+\( q_{k,m} \) & Target share of cell \( (k,m) \): \( E_{z,k,m} \) divided by the sum of \( E_{z,k,m'} \) over all cells \( m' \) of tabulation \( k \). \\ \hline
+\( e_c \) & Non-negative coverage slack for zero-capacity cell \( c \): it absorbs any shortfall below the carrier requirement \( \nu_c \) in the pool-support block. It is a construction variable and does not enter the zone objective. \\ \hline
+\( d_{k,m} \) & Deviation variable for cell \( (k,m) \): absolute deviation of the admitted set's contribution from the target share, used to order support sets during construction. \\ \hline
+\( e_{z,c} \) & Zone-indexed form of the coverage slack \( e_c \), used by the pool-support block. \\ \hline
+\( d_{z,k,m} \) & Zone-indexed form of the deviation variable \( d_{k,m} \), used by the pool-support block. \\ \hline
+\( \lambda_0 \) & Weight on zero-capacity-cell coverage in the support block's construction tie-break. \\ \hline
+\( \lambda_1 \) & Weight on marginal deviation in the support block's construction tie-break. \\ \hline
+\( w_{k,m} \) & Cell weight \( 1/\bigl(|M_k|\max(E_{z,k,m}, 1)\bigr) \), chosen so that every tabulation exerts equal influence regardless of its size. \\ \hline
+\( K_z \) & Upper bound on the number of households selectable for zone \( z \). \\ \hline
+\( P^{\text{add}}_z \) & Upper bound on the persons added for zone \( z \). \\ \hline
+\( s_j \) & Household size (number of persons) of candidate \( j \). \\ \hline
+\( \min \frac{1}{|\mathcal{Z}|}\sum_{z} \text{RSSZ}_z \) & Objective function: the zone fit alone; pool coverage and marginal deviation are construction constraints, not part of this minimisation. \\ \hline
 
 \end{longtable}
 % \tag{FORM-NOTATION-END}
 
 \FloatBarrier
 \subsection{Formulation}
-This study addresses the challenge of synthesizing populations so that the synthetic population's marginal distributions align with predefined constraining tabulations. The fit is evaluated using the \gls{rssz} statistic, proposed by \cite{Voas2001EvaluatingMicrodata} and refined by \cite{Huang2001AMicrodata.}, which normalises the squared deviation by the expected count so that small and large categories are treated on a comparable scale \citep{Rahman2023PopulationTechnique}.
+This study addresses the challenge of synthesizing populations so that the synthetic population's marginal distributions align with predefined constraining tabulations. The fit is evaluated using the \gls{rssz} statistic, proposed by Voas and Williamson \cite{Voas2001EvaluatingMicrodata} and refined by Huang and Williamson \cite{Huang2001AMicrodata.}, which normalises the squared deviation by the expected count so that small and large categories are treated on a comparable scale \citep{Rahman2023PopulationTechnique}.
 
 For a zone \( z \), the Sum of Squared Z-scores for tabulation \( k \) is the Pearson \(\chi^2\) term over its cells,
 
@@ -89,14 +119,25 @@ which is normalised by the table size and its \(\chi^2\) critical value to obtai
 
 where \( N_k \) is the number of persons contributing to table \( k \) and \( C_k \) the \(\chi^2\) critical value for \( k \) (with \( m-1 \) degrees of freedom for a table with \( m \) cells). Dividing by \( C_k \) lets tables with different numbers of cells be compared on an equal footing.
 
-The synthetic population is constructed independently for each zone. For each zone, a subset of households---and therefore individuals---is selected from the candidate pool and iteratively refined to minimise \( \text{RSSZ}_z \). Because the pool carries SA4-level geography and each SA2 zone is a subset of an SA4 region, zones can be fitted independently and in any order without affecting the result.
+The synthetic population is constructed independently for each zone. For each zone, a subset of households, and therefore individuals, is selected from the candidate pool and iteratively refined to minimise \( \text{RSSZ}_z \). Because the pool carries SA4-level geography and each SA2 zone is a subset of an SA4 region, zones can be fitted independently and in any order without affecting the result.
+
+\input{files/mip_expansion_formulation.tex}
 
 \subsection*{Objective Function}
-The objective minimises the mean zone-level RSSZ across the region:
-
-\[
-\min \; \frac{1}{|\mathcal{Z}|} \sum_{z \in \mathcal{Z}} \text{RSSZ}_z .
-\]
+The objective is the zone fit alone:
+\begin{equation}
+\min_{x}\;\; \frac{1}{|\mathcal{Z}|}\sum_{z\in\mathcal{Z}}
+\text{RSSZ}_z,
+\label{eq:objective}
+\end{equation}
+where \(x\) is the zone-level household selection. Pool coverage and pool marginal
+deviation are not objectives of the population fit. They are construction
+mechanisms that give the fitter a supported pool: coverage ensures that a
+sample-zero cell has enough carriers to be selectable, and the marginal
+deviation is used only to choose among feasible donor sets while the pool is
+being built. Once the pool is fixed, the fitter optimises \eqref{eq:objective};
+the construction terms do not enter that minimisation and do not compete with
+RSSZ.
 
 \subsection*{Constraints}
 The assignment of individuals to households within each zone is subject to the following constraints. Constraints C1--C4 and C6 are enforced (softly, via the objective, for the count targets) by the \gls{sa} fitting stage; C5 and the deterministic census rules of Appendix~\ref{sec:ref} are enforced upstream, by pool construction and household matching, not by the annealer.
@@ -115,14 +156,88 @@ The assignment of individuals to households within each zone is subject to the f
         \sum_{i \in \mathcal{I}} x_{i,h} = H_{h,z}, \quad \forall h \in \mathcal{H}_z, \, z \in \mathcal{Z}
         \label{eq:household_size}
     \end{align}
-    The number of individuals assigned to household \( h \) matches the household's size \( H_{h,z} \), as determined by the household-reconstruction stage.
+    The number of individuals assigned to household \( h \) matches the household's size \( H_{h,z} \), which is fixed by the household identity each pool record carries.
 
-    \item \textbf{Marginal Attribute Matching:}
+    \item \textbf{Marginal attribute counts, and the reporting bound (reported, not imposed):}
     \begin{align}
         O_{z,k,m} &= \sum_{h \in \mathcal{H}_z} \sum_{i \in \mathcal{I}} x_{i,h} \cdot \mathbb{1}[A_{i,k} = m], \quad \forall z \in \mathcal{Z}, \, k \in \mathcal{K}, \, m \label{eq:marginal_count} \\
         \left| O_{z,k,m} - E_{z,k,m} \right| &\leq \text{tol}_{k,m} \cdot E_{z,k,m}, \quad \forall z \in \mathcal{Z}, \, k \in \mathcal{K}, \, m \label{eq:marginal_tolerance}
     \end{align}
-    Equation~\eqref{eq:marginal_count} counts, via the membership indicator \( \mathbb{1}[A_{i,k}=m] \), the synthesized number \( O_{z,k,m} \) of assigned individuals falling in each marginal cell; Equation~\eqref{eq:marginal_tolerance} bounds its relative deviation from the census target \( E_{z,k,m} \) by the tolerance \( \text{tol}_{k,m} \). The RSSZ objective penalises this deviation proportionally, so the tolerance acts as a convergence/reporting criterion rather than a hard feasibility gate.
+    Equation~\eqref{eq:marginal_count} counts, via the membership indicator \( \mathbb{1}[A_{i,k}=m] \), the synthesized number \( O_{z,k,m} \) of assigned individuals falling in each marginal cell. \( O_{z,k,m} \) is the quantity the fit is judged on, but it is not imposed as a threshold: the mixed-integer path minimises the worst such deviation,
+\[
+  \min_{x} \; \max_{k \in \mathcal{K}} \; \max_{m \in \mathcal{M}_k} \;
+  \frac{\left| O_{z,k,m}(x) - E_{z,k,m} \right|}{E_{z,k,m}},
+\]
+where \( x \) is the zone-level household selection and \( \mathcal{M}_k \) is the category set of table \( k \), so no tolerance enters the formulation and the deviation reported afterwards is an outcome rather than an input. The SA path retains the RSSZ objective, which penalises the same deviations proportionally. Equation~\eqref{eq:marginal_tolerance} is therefore a reporting bound used to summarise a fitted population, not a constraint that the solver is required to satisfy.
+
+    \item \textbf{Geography and support:}
+    The control targets and the donor material are defined at different geographies, and the
+    formulation must keep them aligned. Targets \( E_{z,k,m} \) are SA2 marginals. The fused
+    microdata is defined per SA4: the map \( a: \mathcal{Z} \to \mathcal{G} \) from SA2 zones
+    to SA4 regions is many-to-one, and the sample \( D_{a(z)} \) is drawn once per SA4, so the
+    candidate set \( \mathcal{H}_z \) is a slice of \( D_{a(z)} \) rather than a sample of zone
+    \( z \) itself.
+
+    The base slice is exclusive, and there is no fallback. \( \mathcal{H}_z \) is built from
+    \( D_{a(z)} \) alone; if the base slice holds no candidate for a given cell, that cell is
+    a sample zero for \( \mathcal{H}_z \), not an opportunity to borrow another SA4's base
+    record. Expansion may construct a new record for it from a global donor, as specified
+    below. The per-SA4 base pools therefore partition the global pool by SA4 region:
+    \( \mathcal{H}_z \subseteq D_{a(z)} \) for every \( z \), and
+    \( a(z_1) \neq a(z_2) \) implies
+    \( \mathcal{H}_{z_1} \cap \mathcal{H}_{z_2} = \varnothing \). That disjointness removes
+    cross-zone cloning structurally: two zones whose SA4 assignments differ cannot draw the
+    same record, so no shared global store can leak one zone's sample into another and no
+    post-hoc deduplication is required to prevent it. Constructed records are not part of
+    this base partition: they are built per SA2 and tagged to it, as specified below.
+
+    A cell is a \emph{sample zero} when
+    \( E_{z,k,m} > 0 \) and no candidate in \( \mathcal{H}_z \) contributes to it, that is
+    \( \sum_{h \in \mathcal{H}_z} c_{h,k,m} = 0 \): the target is positive but the slice supplies
+    nothing, which is a property of the sample rather than of the population. Expansion seeks
+    \( \mathcal{H}_z' \supseteq \mathcal{H}_z \), with additions constructed on local
+    shells but donor member profiles drawn from the wider census population, such
+    that
+    \[
+      r_{\max} \sum_{h \in \mathcal{H}_z'} c_{h,k,m} \;\ge\; E_{z,k,m}
+    \]
+    for every sample-zero cell, equivalently
+    \( \sum_{h \in \mathcal{H}_z'} c_{h,k,m} \ge \nu_{z,k,m} \), subject to the structural constraints above. Here
+    \( r_{\max} \) is the replication ceiling and \( c_{h,k,m} \in \mathbb{Z}_{\ge 0} \) is
+    household \( h \)'s contribution to cell \( (k,m) \), counted per person for person-level
+    tabulations and once per dwelling for dwelling-level tabulations. A cell is classed
+    unsourceable only when the donor ladder finds no feasible donor anywhere in the
+    census, which is the residual the expansion audit reports.
+
+    The amount of expansion is set by the marginals, not by a budget. For each zone \( z \)
+    and each cell \( (k,m) \) with \( E_{z,k,m} > 0 \) in the zone's control tables, expansion
+    constructs a set \( \mathcal{N}_z = \mathcal{H}_z' \setminus \mathcal{H}_z \) of new
+    candidate households on shells from \( D_{a(z)} \) such that the coverage inequality above holds for
+    every sample-zero cell, subject to the structural rules \( \mathcal{R} \) and the per-zone
+    constraints already stated: household size \( s_h \), structural feasibility, and rule
+    feasibility. Donor member profiles may be imported from the wider census population,
+    because the purpose is to construct a record for a cell the SA4 slice lacks; the shell
+    is local and the record is new. Every constructed record is tagged to \( z \) and
+    receives a fresh identifier, so \( \mathcal{N}_{z_1} \cap \mathcal{N}_{z_2} = \varnothing \)
+    even when \( a(z_1) = a(z_2) \): sibling SA2s do not share the constructed pool. The
+    ordinal-adjacent rule may shift a band, and it falls back to the global donor ladder
+    when the SA4 slice has no donor. Structural zeros, cells with \( E_{z,k,m} = 0 \), are held at zero by
+    construction and never enter the construction program. The requirement on each cell is
+    derived from \( E_{z,k,m} \) itself: writing
+    \( \mathrm{gap}_{z,k,m} = E_{z,k,m} - r_{\max}\sum_{h \in \mathcal{H}_z} c_{h,k,m} \) for a
+    sample-zero cell, the construction needs at least
+    \( \nu_{z,k,m} = \lceil \mathrm{gap}_{z,k,m} / r_{\max} \rceil \) additional
+    contribution units from households carrying that cell, and the zone's program scales with
+    \( \sum_{(k,m)} \nu_{z,k,m} \), or less where one
+    household serves several cells. The constructed menu contains at least
+    \( \nu_{z,k,m} \) donor variants for each zero cell, so the selection is not
+    limited by a fixed menu breadth. No fixed ceiling on transplanted cells, per-cell copies,
+    or added persons is applied. A zone with a larger marginal gap therefore receives a larger
+    construction program automatically, and a zone with no positive gap receives none.
+    Expansion may append the full constructed menu for the zone rather than only the
+    coverage-minimal subset. The coverage inequality is therefore a lower bound on the
+    addition: the extra menu records enlarge that SA2's options without being shared with
+    any other SA2.
 
     \item \textbf{Assignment and Household Capacity:}
     \begin{align}
@@ -147,4 +262,7 @@ The assignment of individuals to households within each zone is subject to the f
 
 \end{enumerate}
 
+Constraint C7 closes the zone program. Pool support is enabled by default: the constraint block \eqref{eq:mip_joint} above is appended to the same constraint set, and the admitted pool is \(\mathcal{J}_z^{+}=\{j\in\mathcal{J}_z:y_j=1\}\). When the block is disabled, \(\mathcal{J}_z^{+}=\mathcal{H}_z\): no constructed record is admitted, so the fit cannot use the extra pool. The block introduces support variables and construction slacks but no objective term, so \eqref{eq:objective} and the fitting procedure are identical in the two runs. The only change is the candidate set available to the fit, which is what makes the RSSZ difference between the two runs attributable to pool support rather than to a different criterion.
+
 The census rules applied in the case study are described in Section~\ref{sec:casestudy} and formalised in Appendix~\ref{sec:ref}.
+

@@ -1,4 +1,4 @@
-\subsection{Candidate-Pool Expansion for Zero-Capacity Cells}
+﻿\subsection{Candidate-Pool Expansion for Zero-Capacity Cells}
 \label{sec:mip_pool_expansion}
 
 A pool that is feasible and cell-complete at the level of the modelled
@@ -8,9 +8,10 @@ in the limiting case no household in the zone's candidate pool carries the cell
 at all. This \emph{zero-capacity cell} is a support gap rather than a data
 error, and reweighting cannot repair it: iterative proportional updating adjusts
 the weights of existing records but cannot create a record with an unobserved
-combination. Candidate-pool expansion therefore adds the smallest set of
-rule-feasible records needed to make such cells selectable, and leaves partial
-shortfalls---cells with positive but insufficient capacity---to the zone fitter,
+combination. Candidate-pool expansion therefore adds the set of rule-feasible
+records required by each cell's carrier requirement $\nu_c=\lceil E_{z,k,m}/r_{\max}\rceil$
+needed to make such cells selectable, and leaves partial
+shortfalls, cells with positive but insufficient capacity, to the zone fitter,
 which can replicate a candidate within its own replication limit.
 
 \paragraph{Constructing candidates.}
@@ -27,17 +28,18 @@ have no person-level repair, the module instead copies a whole observed donor
 household, which is feasible by construction.
 
 \paragraph{Selecting candidates.}
-The candidates are selected together rather than one cell at a time. A single
-selection is chosen to cover every zero-capacity cell for which a feasible
-candidate exists, using as few added households as possible and---among
-selections that achieve the same coverage---keeping the added set's aggregate
+The candidates are admitted together rather than one cell at a time. A single
+support set is chosen to cover every zero-capacity cell for which a feasible
+candidate exists, using as few added households as possible and, among
+support sets that achieve the same coverage, keeping the added set's aggregate
 composition close to the zone's marginal totals. Coverage is the priority: a
-cell with no feasible candidate anywhere cannot make the problem infeasible and
+cell with no feasible candidate anywhere cannot make the block infeasible and
 is reported instead of forced, and because each added household is penalised, the
-selection stops once every sourceable cell is covered. In practice the coverage
-objective dominates, so the marginal-matching term acts as a tie-breaker among
-equally good coverings rather than as a fit to the zone's full distribution---the latter is the object of the zone fitter. The two optimisation programs (a
-per-candidate repair and the selection program) are stated in
+construction stops once every sourceable cell is covered. In practice the coverage
+term dominates the construction ordering, so the marginal-matching term acts as a
+tie-breaker among equally good coverings rather than as a fit to the zone's full
+distribution, the latter is the object of the zone fitter. The per-candidate
+repair and the optional support block are stated in
 Appendix~\ref{sec:pool_expansion_audit}; \cref{fig:mip-expansion-process}
 traces the four stages from the cell audit to the appended households.
 
@@ -57,7 +59,7 @@ additions, and the fitting stage that follows decides which candidates are used.
 On ten SA2 zones the mechanism identified 123 zero-capacity cells among 146
 deficient cells (the remaining 23 were partial shortfalls). It produced feasible
 candidates for 70 of the 73 cells that were sourceable, and the selection covered
-all 70, adding 14 households (18 persons) in total---one or two households per
+all 70, adding 14 households (18 persons) in total, one or two households per
 zone. Coverage is therefore achieved without forcing the pool to reproduce the
 shortfall, every added record satisfies the shared structural constraints, and
 the expanded pool introduces no new constraint violations. The 53 uncovered cells
@@ -79,8 +81,8 @@ sourceable bands: the \texttt{hrsp} cells are the ``not stated'' (101) and
 ``overseas visitor'' (103) codes and \texttt{tend:6} is a not-applicable padding
 code, while \texttt{qalfp:16} and \texttt{strd:9} are nominal categories absent
 from the census extract; only the three \texttt{tenlld:11} cells had a positive
-target with no feasible candidate. Genuinely \emph{ordinal} shortfalls---an
-applicable income, hours, or qualification-level band with no donor---are instead
+target with no feasible candidate. Genuinely \emph{ordinal} shortfalls, an
+applicable income, hours, or qualification-level band with no donor, are instead
 filled by borrowing the nearest applicable band and shifting the value to the
 target, restricted to the employment/age-applicable range (children and
 not-applicable persons are never shifted into an ordinal band) and re-checked
@@ -88,3 +90,4 @@ against the individual and household rules.}
 \label{fig:zero_cell_coverage}
 \end{figure}
 \FloatBarrier
+

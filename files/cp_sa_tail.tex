@@ -1,0 +1,21 @@
+\begin{table}[h!]
+\centering
+\caption{Tail diagnostic on the five worst MIP+SA zones: the released
+1{,}000-iteration run versus 5{,}000 iterations seeded from the MIP+IPU
+allocation. Entries are 11-table RSSZ on the 367-zone basis. The MIP+IPU
+value is shown for reference. Zone 302031036 is the pathological pool gap and is
+not improved by the seed; the other four are.}
+\label{tab:cp_sa_tail}
+\footnotesize
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Zone & MIP+SA 1{,}000 & MIP+SA 5{,}000 + seed & MIP+IPU \\
+\midrule
+302031036 & 13.45 & 207.16 & 27.57 \\
+112011237 & 3.64 & 1.63 & 1.65 \\
+309071256 & 4.46 & 1.06 & 1.12 \\
+314011386 & 3.67 & 1.08 & 0.63 \\
+303051073 & 2.92 & 0.65 & 0.68 \\
+\bottomrule
+\end{tabular}
+\end{table}
