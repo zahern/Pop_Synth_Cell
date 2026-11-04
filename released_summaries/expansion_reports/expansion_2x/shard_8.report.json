@@ -1,0 +1,742 @@
+{
+  "mode": "joint",
+  "rep_max": 40,
+  "pool": "/home/ahernz/Paper_Plan/synth_pop/outputs/feasible_pool.csv",
+  "census": "/home/ahernz/Population_Synth/LINKED_DATA_national.csv",
+  "relationship_constraints": "constraint_rules.CONSTRAINT_CHECKS plus observed-domain forbidden-pair cuts",
+  "soft_dag_scoring": false,
+  "donor_policy": "global-donor-ladder",
+  "append_menu_candidates": true,
+  "append_only": true,
+  "include_partial_deficits": true,
+  "size_aware_shells": true,
+  "shell_growth": false,
+  "family_clone": false,
+  "lambda_composition": 1.0,
+  "max_size7_share": null,
+  "max_mtwp17_share": null,
+  "min_admitted_households": 0,
+  "id_offset": 80000000,
+  "budget": {
+    "source": "ceil(gap/rep_max) per sample-zero cell",
+    "max_new_households": null,
+    "max_new_persons": null,
+    "max_transplant_cells": null
+  },
+  "donors_per_cell": 2000,
+  "shells_per_cell": 32,
+  "n_pool_rows": 1396342,
+  "n_census_rows": 1252479,
+  "n_forbidden_pair_cuts": 2027,
+  "zones_file": "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_2x/shards/shard_8.zones",
+  "n_zones_requested": 19,
+  "zones_missing_from_tables": [],
+  "n_zones_audited": 19,
+  "n_table_zones": 19,
+  "n_deficit_cells": 155,
+  "deficit_total_gap": 30898.0,
+  "n_zero_cells": 155,
+  "n_target_cells": 155,
+  "n_partial_target_cells": 0,
+  "n_partial_deficit_cells": 0,
+  "n_zones_processed": 19,
+  "n_transplant_households": 33163,
+  "n_transplant_rows": 110176,
+  "n_appended_menu_households": 33074,
+  "n_selected_persons": 110176,
+  "n_zero_cells_covered": 108,
+  "n_zero_cells_uncovered": 47,
+  "n_zero_cells_at_requirement": 84,
+  "n_zero_cells_below_requirement": 71,
+  "n_ordinal_shift_cells": 0,
+  "skipped": {
+    "no_donor_anywhere": 19
+  },
+  "zone_reports": [
+    {
+      "zone": "112021244",
+      "regucp": "4",
+      "n_zero_cells": 9,
+      "n_candidates": 10497,
+      "candidate_sources": {
+        "verbatim": 10497
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 66,
+      "budget_households": 66,
+      "budget_persons": 792,
+      "n_selected_households": 9,
+      "n_selected_persons": 34,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 3,
+      "n_zero_cells_at_requirement": 4,
+      "n_zero_cells_below_requirement": 5,
+      "marginal_deviation_sum": 16.701423800507726,
+      "marginal_deviation_mean": 1.9992440840744747,
+      "marginal_deviation_max": 26.245800552838617,
+      "solver": "incumbent",
+      "objective": 1600016.7914238004,
+      "n_menu_households": 10497,
+      "n_appended_menu_households": 2088,
+      "uncovered_cells": [
+        "mtwp:3",
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "mtwp:3",
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "301021007",
+      "regucp": "31",
+      "n_zero_cells": 8,
+      "n_candidates": 10245,
+      "candidate_sources": {
+        "verbatim": 10245
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 50,
+      "budget_households": 50,
+      "budget_persons": 600,
+      "n_selected_households": 4,
+      "n_selected_persons": 31,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 2,
+      "n_zero_cells_at_requirement": 5,
+      "n_zero_cells_below_requirement": 3,
+      "marginal_deviation_sum": 2.972883020752947,
+      "marginal_deviation_mean": 2.2551884375421145,
+      "marginal_deviation_max": 24.958810503005378,
+      "solver": "incumbent",
+      "objective": 300003.01288302074,
+      "n_menu_households": 10245,
+      "n_appended_menu_households": 1845,
+      "uncovered_cells": [
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "302011026",
+      "regucp": "31",
+      "n_zero_cells": 8,
+      "n_candidates": 10245,
+      "candidate_sources": {
+        "verbatim": 10245
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 18,
+      "budget_households": 18,
+      "budget_persons": 216,
+      "status": "no_selection",
+      "n_selected_households": 0,
+      "n_selected_persons": 0,
+      "n_zero_cells_covered": 0,
+      "n_zero_cells_uncovered": 8,
+      "n_zero_cells_at_requirement": 0,
+      "n_zero_cells_below_requirement": 8,
+      "marginal_deviation_sum": 0.0,
+      "marginal_deviation_mean": 0.0,
+      "marginal_deviation_max": 0.0,
+      "solver": "incumbent",
+      "objective": 1800000.0,
+      "uncovered_cells": [
+        "hrsp:10",
+        "indp:23",
+        "mtwp:17",
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5",
+        "typp:11"
+      ]
+    },
+    {
+      "zone": "302041046",
+      "regucp": "31",
+      "n_zero_cells": 8,
+      "n_candidates": 10245,
+      "candidate_sources": {
+        "verbatim": 10245
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 40,
+      "budget_households": 40,
+      "budget_persons": 480,
+      "n_selected_households": 3,
+      "n_selected_persons": 13,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 2,
+      "n_zero_cells_at_requirement": 4,
+      "n_zero_cells_below_requirement": 4,
+      "marginal_deviation_sum": 3.1861820608637714,
+      "marginal_deviation_mean": 0.8556967356680185,
+      "marginal_deviation_max": 11.353715170278637,
+      "solver": "incumbent",
+      "objective": 2000003.2161820608,
+      "n_menu_households": 10245,
+      "n_appended_menu_households": 1845,
+      "uncovered_cells": [
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "303031066",
+      "regucp": "32",
+      "n_zero_cells": 8,
+      "n_candidates": 10219,
+      "candidate_sources": {
+        "verbatim": 10219
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 22,
+      "budget_households": 22,
+      "budget_persons": 264,
+      "n_selected_households": 5,
+      "n_selected_persons": 17,
+      "n_zero_cells_covered": 7,
+      "n_zero_cells_uncovered": 1,
+      "n_zero_cells_at_requirement": 7,
+      "n_zero_cells_below_requirement": 1,
+      "marginal_deviation_sum": 1.749901899600537,
+      "marginal_deviation_mean": 1.0303269161981166,
+      "marginal_deviation_max": 9.953580551396106,
+      "solver": "optimal",
+      "objective": 100001.7999018996,
+      "n_menu_households": 10219,
+      "n_appended_menu_households": 1817,
+      "uncovered_cells": [
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:16"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "304021086",
+      "regucp": "33",
+      "n_zero_cells": 8,
+      "n_candidates": 10292,
+      "candidate_sources": {
+        "verbatim": 10292
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 18,
+      "budget_households": 18,
+      "budget_persons": 216,
+      "n_selected_households": 1,
+      "n_selected_persons": 6,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 2,
+      "n_zero_cells_at_requirement": 4,
+      "n_zero_cells_below_requirement": 4,
+      "marginal_deviation_sum": 0.4528041779126678,
+      "marginal_deviation_mean": 0.3970904234045787,
+      "marginal_deviation_max": 5.0436879432624115,
+      "solver": "incumbent",
+      "objective": 1200000.462804178,
+      "n_menu_households": 10292,
+      "n_appended_menu_households": 1892,
+      "uncovered_cells": [
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "305011106",
+      "regucp": "33",
+      "n_zero_cells": 8,
+      "n_candidates": 10292,
+      "candidate_sources": {
+        "verbatim": 10292
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 58,
+      "budget_households": 58,
+      "budget_persons": 696,
+      "n_selected_households": 8,
+      "n_selected_persons": 39,
+      "n_zero_cells_covered": 7,
+      "n_zero_cells_uncovered": 1,
+      "n_zero_cells_at_requirement": 6,
+      "n_zero_cells_below_requirement": 2,
+      "marginal_deviation_sum": 1.1732655989466814,
+      "marginal_deviation_mean": 2.4820815854731526,
+      "marginal_deviation_max": 31.26786763266105,
+      "solver": "incumbent",
+      "objective": 300001.25326559896,
+      "n_menu_households": 10292,
+      "n_appended_menu_households": 1888,
+      "uncovered_cells": [
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:16",
+        "rlhp:11"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "305031126",
+      "regucp": "33",
+      "n_zero_cells": 8,
+      "n_candidates": 10292,
+      "candidate_sources": {
+        "verbatim": 10292
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 53,
+      "budget_households": 53,
+      "budget_persons": 636,
+      "n_selected_households": 4,
+      "n_selected_persons": 20,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 2,
+      "n_zero_cells_at_requirement": 5,
+      "n_zero_cells_below_requirement": 3,
+      "marginal_deviation_sum": 1.5672810908732961,
+      "marginal_deviation_mean": 1.445460221408731,
+      "marginal_deviation_max": 16.85354691075515,
+      "solver": "incumbent",
+      "objective": 1500001.607281091,
+      "n_menu_households": 10292,
+      "n_appended_menu_households": 1889,
+      "uncovered_cells": [
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "309021232",
+      "regucp": "36",
+      "n_zero_cells": 8,
+      "n_candidates": 10291,
+      "candidate_sources": {
+        "verbatim": 10291
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 34,
+      "budget_households": 34,
+      "budget_persons": 408,
+      "n_selected_households": 1,
+      "n_selected_persons": 6,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 2,
+      "n_zero_cells_at_requirement": 4,
+      "n_zero_cells_below_requirement": 4,
+      "marginal_deviation_sum": 0.8492338597081539,
+      "marginal_deviation_mean": 0.47734217174558297,
+      "marginal_deviation_max": 5.287853107344633,
+      "solver": "incumbent",
+      "objective": 2000000.8592338597,
+      "n_menu_households": 10291,
+      "n_appended_menu_households": 1893,
+      "uncovered_cells": [
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "309071252",
+      "regucp": "36",
+      "n_zero_cells": 8,
+      "n_candidates": 10291,
+      "candidate_sources": {
+        "verbatim": 10291
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 53,
+      "budget_households": 53,
+      "budget_persons": 636,
+      "n_selected_households": 6,
+      "n_selected_persons": 40,
+      "n_zero_cells_covered": 7,
+      "n_zero_cells_uncovered": 1,
+      "n_zero_cells_at_requirement": 6,
+      "n_zero_cells_below_requirement": 2,
+      "marginal_deviation_sum": 2.1987618755995504,
+      "marginal_deviation_mean": 2.4346136697054486,
+      "marginal_deviation_max": 35.119170984455955,
+      "solver": "incumbent",
+      "objective": 200002.2587618756,
+      "n_menu_households": 10291,
+      "n_appended_menu_households": 1890,
+      "uncovered_cells": [
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:16",
+        "rlhp:11"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "309091541",
+      "regucp": "36",
+      "n_zero_cells": 8,
+      "n_candidates": 10291,
+      "candidate_sources": {
+        "verbatim": 10291
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 92,
+      "budget_households": 92,
+      "budget_persons": 1104,
+      "n_selected_households": 14,
+      "n_selected_persons": 73,
+      "n_zero_cells_covered": 7,
+      "n_zero_cells_uncovered": 1,
+      "n_zero_cells_at_requirement": 7,
+      "n_zero_cells_below_requirement": 1,
+      "marginal_deviation_sum": 5.4874034145680906,
+      "marginal_deviation_mean": 4.162325785378142,
+      "marginal_deviation_max": 48.72256532066508,
+      "solver": "incumbent",
+      "objective": 200005.62740341458,
+      "n_menu_households": 10291,
+      "n_appended_menu_households": 1882,
+      "uncovered_cells": [
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:16"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "310031284",
+      "regucp": "37",
+      "n_zero_cells": 8,
+      "n_candidates": 10260,
+      "candidate_sources": {
+        "verbatim": 10260
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 39,
+      "budget_households": 39,
+      "budget_persons": 468,
+      "n_selected_households": 4,
+      "n_selected_persons": 18,
+      "n_zero_cells_covered": 7,
+      "n_zero_cells_uncovered": 1,
+      "n_zero_cells_at_requirement": 5,
+      "n_zero_cells_below_requirement": 3,
+      "marginal_deviation_sum": 4.972558079254053,
+      "marginal_deviation_mean": 1.0634166060829418,
+      "marginal_deviation_max": 14.62343572241183,
+      "solver": "incumbent",
+      "objective": 1800005.0125580793,
+      "n_menu_households": 10260,
+      "n_appended_menu_households": 1859,
+      "uncovered_cells": [
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "310041565",
+      "regucp": "37",
+      "n_zero_cells": 9,
+      "n_candidates": 11553,
+      "candidate_sources": {
+        "verbatim": 11553
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 23,
+      "budget_households": 23,
+      "budget_persons": 276,
+      "status": "no_selection",
+      "n_selected_households": 0,
+      "n_selected_persons": 0,
+      "n_zero_cells_covered": 0,
+      "n_zero_cells_uncovered": 9,
+      "n_zero_cells_at_requirement": 0,
+      "n_zero_cells_below_requirement": 9,
+      "marginal_deviation_sum": 0.0,
+      "marginal_deviation_mean": 0.0,
+      "marginal_deviation_max": 0.0,
+      "solver": "incumbent",
+      "objective": 2300000.0,
+      "uncovered_cells": [
+        "hrsp:10",
+        "indp:23",
+        "mtwp:4",
+        "mtwp:17",
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5",
+        "typp:11"
+      ]
+    },
+    {
+      "zone": "311041569",
+      "regucp": "38",
+      "n_zero_cells": 8,
+      "n_candidates": 10181,
+      "candidate_sources": {
+        "verbatim": 10181
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 26,
+      "budget_households": 26,
+      "budget_persons": 312,
+      "n_selected_households": 1,
+      "n_selected_persons": 6,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 2,
+      "n_zero_cells_at_requirement": 4,
+      "n_zero_cells_below_requirement": 4,
+      "marginal_deviation_sum": 0.5028798779855205,
+      "marginal_deviation_mean": 0.472833002997162,
+      "marginal_deviation_max": 5.007682458386684,
+      "solver": "incumbent",
+      "objective": 1200000.512879878,
+      "n_menu_households": 10181,
+      "n_appended_menu_households": 1783,
+      "uncovered_cells": [
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "313021366",
+      "regucp": "40",
+      "n_zero_cells": 8,
+      "n_candidates": 10239,
+      "candidate_sources": {
+        "verbatim": 10239
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 96,
+      "budget_households": 96,
+      "budget_persons": 1152,
+      "n_selected_households": 14,
+      "n_selected_persons": 68,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 2,
+      "n_zero_cells_at_requirement": 5,
+      "n_zero_cells_below_requirement": 3,
+      "marginal_deviation_sum": 4.18620290857668,
+      "marginal_deviation_mean": 3.5260116034686066,
+      "marginal_deviation_max": 41.42754941190736,
+      "solver": "incumbent",
+      "objective": 1000004.3262029085,
+      "n_menu_households": 10239,
+      "n_appended_menu_households": 1832,
+      "uncovered_cells": [
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "314011383",
+      "regucp": "40",
+      "n_zero_cells": 8,
+      "n_candidates": 10239,
+      "candidate_sources": {
+        "verbatim": 10239
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 32,
+      "budget_households": 32,
+      "budget_persons": 384,
+      "n_selected_households": 1,
+      "n_selected_persons": 6,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 2,
+      "n_zero_cells_at_requirement": 4,
+      "n_zero_cells_below_requirement": 4,
+      "marginal_deviation_sum": 2.6716331079767373,
+      "marginal_deviation_mean": 0.48564027410483085,
+      "marginal_deviation_max": 5.062529457973292,
+      "solver": "incumbent",
+      "objective": 1800002.6816331078,
+      "n_menu_households": 10239,
+      "n_appended_menu_households": 1842,
+      "uncovered_cells": [
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "316021419",
+      "regucp": "41",
+      "n_zero_cells": 8,
+      "n_candidates": 10240,
+      "candidate_sources": {
+        "verbatim": 10240
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 39,
+      "budget_households": 39,
+      "budget_persons": 468,
+      "n_selected_households": 5,
+      "n_selected_persons": 17,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 2,
+      "n_zero_cells_at_requirement": 4,
+      "n_zero_cells_below_requirement": 4,
+      "marginal_deviation_sum": 2.84055282073517,
+      "marginal_deviation_mean": 0.971141397417739,
+      "marginal_deviation_max": 10.571471743729225,
+      "solver": "incumbent",
+      "objective": 1500002.8905528206,
+      "n_menu_households": 10240,
+      "n_appended_menu_households": 1838,
+      "uncovered_cells": [
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "316061442",
+      "regucp": "41",
+      "n_zero_cells": 9,
+      "n_candidates": 11533,
+      "candidate_sources": {
+        "verbatim": 11533
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 52,
+      "budget_households": 52,
+      "budget_persons": 624,
+      "n_selected_households": 3,
+      "n_selected_persons": 19,
+      "n_zero_cells_covered": 6,
+      "n_zero_cells_uncovered": 3,
+      "n_zero_cells_at_requirement": 4,
+      "n_zero_cells_below_requirement": 5,
+      "marginal_deviation_sum": 4.115368390056072,
+      "marginal_deviation_mean": 1.1654261706643791,
+      "marginal_deviation_max": 16.211697027804412,
+      "solver": "incumbent",
+      "objective": 2400004.1453683903,
+      "n_menu_households": 11533,
+      "n_appended_menu_households": 3133,
+      "uncovered_cells": [
+        "mtwp:4",
+        "qalfp:12",
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "mtwp:4",
+        "qalfp:12",
+        "qalfp:16",
+        "rlhp:11",
+        "stup:5"
+      ],
+      "status": "ok"
+    },
+    {
+      "zone": "317011457",
+      "regucp": "37",
+      "n_zero_cells": 8,
+      "n_candidates": 10260,
+      "candidate_sources": {
+        "verbatim": 10260
+      },
+      "budget_source": "marginal",
+      "marginal_household_requirement": 46,
+      "budget_households": 46,
+      "budget_persons": 552,
+      "n_selected_households": 6,
+      "n_selected_persons": 29,
+      "n_zero_cells_covered": 7,
+      "n_zero_cells_uncovered": 1,
+      "n_zero_cells_at_requirement": 6,
+      "n_zero_cells_below_requirement": 2,
+      "marginal_deviation_sum": 2.863297472246636,
+      "marginal_deviation_mean": 1.7131518668491286,
+      "marginal_deviation_max": 24.410186335403726,
+      "solver": "incumbent",
+      "objective": 1200002.9232974723,
+      "n_menu_households": 10260,
+      "n_appended_menu_households": 1858,
+      "uncovered_cells": [
+        "qalfp:16"
+      ],
+      "below_requirement_cells": [
+        "qalfp:16",
+        "rlhp:11"
+      ],
+      "status": "ok"
+    }
+  ],
+  "out": "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_2x/shards/shard_8.csv",
+  "n_out_rows": 110176,
+  "runtime_s": 77662.7
+}
