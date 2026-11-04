@@ -1,0 +1,23 @@
+{
+  "pool": "/home/ahernz/Paper_Plan/synth_pop/outputs/feasible_pool_expanded_fixed.csv",
+  "hhts_census": "/home/ahernz/Population_Synth/LINKED_DATA_national_hhts.csv",
+  "n_pool_rows": 1879051,
+  "hh_vars": [
+    "BIKES",
+    "EBIKES",
+    "ESCOOTER"
+  ],
+  "person_vars": [
+    "CARLICENCE",
+    "MCLICENCE"
+  ],
+  "location_specific": false,
+  "location_rows": 0,
+  "global_fallback_rows": 0,
+  "location_donor_households": 0,
+  "observed_household_rows": 1214361,
+  "observed_person_rows": 1879051,
+  "hotdeck_filled_rows": 664690,
+  "households_missing_after": 0,
+  "out": "/home/ahernz/Paper_Plan/synth_pop/outputs/feasible_pool_expanded_fixed_hhts.csv"
+}

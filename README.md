@@ -38,7 +38,8 @@ submit_*.sh              login-node submitters (qsub only)
 data_sa2_controls/       full SA2 control tables (26 tables)
 data_sa2_controls_paper19/   the 19 in-sample tables used for fitting
 data_sa2_controls_heldout/   the 7 held-out validation tables
-released_summaries/      small CSVs behind the paper's tables
+released_summaries/      small CSVs and structured job reports behind the paper's tables
+  expansion_reports/     per-shard expansion reports and merge/attach reports
 files/, main_edit3.tex, figures   paper source
 ```
 

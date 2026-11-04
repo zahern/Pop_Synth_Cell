@@ -1,0 +1,32 @@
+{
+  "base": "/home/ahernz/Paper_Plan/synth_pop/outputs/feasible_pool.csv",
+  "shards": [
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_0.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_10.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_11.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_12.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_13.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_14.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_15.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_16.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_17.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_18.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_19.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_1.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_2.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_3.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_4.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_5.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_6.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_7.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_8.csv",
+    "/home/ahernz/Paper_Plan/synth_pop/outputs/expansion_shards/shard_9.csv"
+  ],
+  "n_shards": 20,
+  "base_rows": 1396342,
+  "shard_rows": 67475,
+  "merged_rows": 1463817,
+  "n_unique_households": 569024,
+  "abshid_collisions_base_shards": 0,
+  "out": "/home/ahernz/Paper_Plan/synth_pop/outputs/feasible_pool_expanded.csv"
+}
