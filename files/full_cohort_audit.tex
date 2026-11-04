@@ -37,15 +37,14 @@ CP-MIP (one-MIP, CP pool) & 0.253 (2.093) & 0.220 & 0.049 & 80.5\% & 75.8\% \\
 }
 \end{table}
 
-No arm dominates. SA-Only retains the lowest joint TVD (0.051) and the lowest
-mean $|\Delta V|$ (0.022); the current MIP IPU arm has the lowest identical-person share (2.7\%) and
-the lowest cross-zone cloning (56.6\%), at the cost of a higher marginal RSSZ.
-The one-MIP arm has the lowest marginal median (0.066) but the highest
-identical-person share (80.5\%) and the highest joint TVD (0.220): integer
-replication reproduces whole households many times, so its marginal advantage
-is bought by within-zone duplication rather than by a richer joint structure.
-Its lower cross-zone cloning (75.8\%) reflects the smaller distinct-tuple set,
-not greater diversity. The composition-aware variants improve marginal RSSZ but
-raise within-zone duplication to about 37\%, so the marginal gain is not free:
-it is bought by reusing a smaller set of attribute tuples. This trade-off is
-reported rather than folded into a single ranking.
+No arm dominates. Table~\ref{tab:full_audit} shows the trade-off: SA-Only
+retains the lowest joint TVD and association error, the current MIP IPU arm has
+the lowest within-zone duplication, and the one-MIP arm has the lowest marginal
+median but the highest within-zone duplication and joint TVD. Integer
+replication reproduces whole households many times, so its marginal advantage is
+bought by duplication rather than by a richer joint structure; its lower
+cross-zone cloning reflects the smaller distinct-tuple set, not greater
+diversity. The composition-aware variants improve marginal RSSZ but raise
+duplication, so the marginal gain is not free: it is bought by reusing a smaller
+set of tuples. The trade-off is reported rather than folded into a single
+ranking.

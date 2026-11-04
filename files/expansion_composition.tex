@@ -2,28 +2,23 @@
 \label{sec:expansion_composition}
 The mixed-integer program in Section~\ref{sec:mip_expansion_formulation}
 optimises coverage and marginal composition jointly, but only over the support
-set it selects. To expose the distinction, a 300-donor, 32-shell build was
-produced with the full menu appended (\texttt{--append-menu-candidates}); it is
-the full-menu stress case in Table~\ref{tab:expansion_composition}. In that
-build, the selected set contributes
-2.9\% of the added persons; the other 97.1\% come from appending the remaining
-candidate menu after the solve. The appended
-records are not part of the admission vector $y$, are not in the deviation terms
-$d_{k,m}$, and are not subject to the composition tie-break. The result is a
-pool that is cell-complete but compositionally skewed: the 300-donor build has
-8.7\% size-7 households and 6.9\% \texttt{mtwp} code 17 (``Not stated''),
-against 5.0\% and 0.0\% in the current pool.
+set it selects. To expose the distinction, a full-menu build appends the
+remaining candidate menu after the solve; those appended records are not part of
+the admission vector, are not in the deviation terms and are not subject to the
+composition tie-break. The result is a pool that is cell-complete but
+compositionally skewed, with a surplus of size-7 households and \texttt{mtwp}
+code 17. Table~\ref{tab:expansion_composition} reports that build against the
+controlled variants.
 
 Two composition-controlled variants were built from the same shards, without
 rerunning the MIP. The \emph{coverage-only} variant keeps the selected support
 set and drops the appended menu. The \emph{composition-aware} variant keeps the
 base pool, the selected set and only those appended households that are neither
 size 7 nor contain \texttt{mtwp} code 17. The implementation also exposes a
-composition-weight multiplier, optional size-7/\texttt{mtwp} caps and a
-minimum-admitted-household lower bound; hard caps alone can starve coverage (a
-test with a 1\% \texttt{mtwp} cap selected only one household), so the reported
-variants use the two filters above. Table~\ref{tab:expansion_composition}
-reports their composition and fitted RSSZ.
+composition-weight multiplier, optional caps and a minimum-admitted-household
+bound; hard caps alone can starve coverage, so the reported variants use the two
+filters. Table~\ref{tab:expansion_composition} reports their composition and
+fitted RSSZ.
 
 \begin{table}[h!]
 \centering
@@ -53,35 +48,17 @@ Current MIP-expanded pool & 1{,}463{,}817 & 569{,}024 & 5.6\% & 1.5\% & 0.511 & 
 \par\smallskip
 {\footnotesize\textit{Note:} the 2{,}000-donor rows report composition only; no fit was run on that pool. The filter removes every size-7 and \texttt{mtwp}-17 household by construction, so its 0.0\% entries are definitions rather than outcomes.}
 
-A 2{,}000-donor, 32-shell build was completed as a separate stress test. With
-the full menu appended it produces 3{,}576{,}519 persons and 1{,}207{,}317
-households, but 32.0\% of persons and 85.8\% of households carry \texttt{mtwp}
-code 17 and 21.8\% of households are size 7. The composition filter keeps
-254{,}327 persons (11.7\% of the appended total) and 92{,}888 households,
-giving 1{,}650{,}669 persons and 642{,}587 households: 2.5\% more persons than
-the 300-donor composition-aware pool. The additional donor sample is therefore
-consumed by verbatim census households that the filter removes. The build is
-reported as a negative result: it does not deliver a substantially larger clean
-pool, and it is not used to claim a larger-pool effect.
+A further build increased the donor menu rather than the shell count.
+Table~\ref{tab:expansion_composition} shows that it is dominated by verbatim
+census households carrying \texttt{mtwp} code 17, and that the composition
+filter keeps only a small fraction of the appended records. The filtered pool is
+only marginally larger than the 300-donor composition-aware pool. The build is
+therefore reported as a negative result: it does not deliver a substantially
+larger clean pool and is not used to claim a larger-pool effect.
 
-The composition-controlled variants therefore separate the two questions the
-300-donor full-menu build conflated: whether expansion covers the zero-capacity cells, and
-whether the added records preserve the census composition. The coverage-only
-variant answers the first while removing the second's skew; the
-composition-aware variant asks whether a larger pool can be added without
-importing the not-stated and size-7 surplus.
-
-The fitted result identifies the mechanism. On the 367-zone cohort, the
-composition-aware pool scores an SA mean and median of 0.250 and 0.158, and an
-IPU mean and median of 0.302 and 0.196. The current MIP-expanded pool scores
-0.511 and 0.295 under SA and 0.315 and 0.193 under IPU; the 300-donor full-menu
-build scores 1.822 and 1.168 under SA and 1.127 and 0.789 under IPU; SA-Only
-scores 0.247 and 0.233, and IPU-Only 0.435 and 0.275. The composition-controlled
-pool therefore removes the SA penalty: its SA mean is within 0.003 of SA-Only
-while its median is 0.075 lower. Under IPU it lowers the mean from 0.315 to
-0.302, although the median is essentially unchanged (0.193 to 0.196). The
-coverage-only pool scores 0.329 and 0.177 under SA, and 0.335 and 0.214 under
-IPU; it also recovers most of the penalty, but the composition-aware append
-keeps substantially more candidates at the same composition. The difference between the two controlled
-variants is therefore pool size, not composition: both remove the
-appended-menu skew.
+The fitted result in Table~\ref{tab:expansion_composition} identifies the
+mechanism. The composition-aware pool removes the SA penalty and lowers the IPU
+mean; the coverage-only pool recovers most of the penalty but keeps fewer
+candidates at the same composition. The difference between the two controlled
+variants is therefore pool size, not composition: both remove the appended-menu
+skew.
