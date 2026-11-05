@@ -330,15 +330,15 @@ arms were fitted on different zones: every arm was fitted and scored on the fitt
 \textbf{Cohort} & \textbf{Zones} & \textbf{Arms sharing it} & \textbf{What it is, and what it is used for} \\
 \midrule
 Scope            & 371 & all & Every SA2 zone in the study area. Four have no usable individual target and are excluded from fitting, so the scope is a bookkeeping total rather than a scored cohort \\
-Fitted cohort    & 367 & all four & The \textbf{single zone set used throughout this paper}: every SA2 zone with a census population. Mean and median RSSZ on the 11 tables every arm carries \\
-Marginal panels  & 60  & all four & Zones in which all four arms have written a full marginal for every in-sample table, which the five-series figures require (Figures~\ref{fig:marginal_differences} and~\ref{fig:marginals_all_tables}) \\
-Held-out matched & 367 & all four & Held-out control-table comparison (Table~\ref{tab:heldout}, Figure~\ref{fig:heldout_tvd}) \\
+Fitted cohort    & 367 & all arms & The \textbf{single zone set used throughout this paper}: every SA2 zone with a census population. Mean and median RSSZ on the 11 tables every arm carries \\
+Marginal panels  & 367 & all arms & Zones in which every arm has written a full marginal for the plotted tables, which the six-series figures require (Figures~\ref{fig:marginal_differences} and~\ref{fig:marginals_all_tables}) \\
+Held-out matched & 367 & all arms & Held-out control-table comparison (Table~\ref{tab:heldout}, Figure~\ref{fig:heldout_tvd}) \\
 Expansion audit  & 367 & expansion step & The zero-capacity-cell audit of every fitted zone's pool slice, with the coverage-selected households for it (Appendix~\ref{sec:pool_expansion_audit}) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-{\footnotesize\textit{Note:} the four exclusions are SA2s 301031014, 304041102 (forest reserve), 310021279 (rural catchment) and 311031315 (military base); each has a control table but no usable individual target, so 367 $+$ 4 accounts for the whole 371-zone scope. Every arm-level result below is computed on the 367-zone fitted cohort over the same 11 control tables.}
+{\footnotesize\textit{Note:} the four exclusions are SA2s 301031014, 304041102 (forest reserve), 310021279 (rural catchment) and 311031315 (military base); each has a control table but no usable individual target, so 367 $+$ 4 accounts for the whole 371-zone scope. Every arm-level result below is computed on the 367-zone fitted cohort; reported RSSZ values use the same 11 shared control tables, and any table or figure computed on the 19-table fitting basis says so in its caption.}
 
 Table~\ref{tab:control_codebook} lists every control-table code used in the paper, the level at which it operates, and whether it belongs to the 11-table core, the additional in-sample tables, or the held-out validation set. ABS table names are shown in uppercase; the fitting code and result files use the same identifiers in lowercase.
 
@@ -346,7 +346,7 @@ Table~\ref{tab:control_codebook} lists every control-table code used in the pape
 
 \subsection{Experimental Settings}
 \label{sec:expsettings}
-The complete configuration is in the Supplementary Material. In brief, the pool is constructed from the fused national microdata under the eleven structural rules; expansion uses a per-zone budget derived from the marginal gap rather than a fixed count; and the fitters use the stated SA/IPU settings. The \textbf{fitting and primary scoring basis is the 11 shared control tables}. The fitting variants are each parallelised into 20 chunks and submitted as independent PBS jobs; walltime and exit codes are logged. The CP arms share a single constructed pool: CP-pool+SA applies the same SA sampler to it, and CP-pool+IPU applies the same IPU implementation.
+The complete configuration is in the Supplementary Material. In brief, the pool is constructed from the fused national microdata under the eleven structural rules; expansion uses a per-zone budget derived from the marginal gap rather than a fixed count; and the fitters use the stated SA/IPU settings. Two control-table bases are used and every table and figure states which one it uses: the \textbf{fitting objective uses all 19 in-sample control tables}, while the \textbf{primary reported comparison uses the 11 tables shared by every completed arm}, a subset of those 19; the seven held-out tables are never fitted. The fitting variants are each parallelised into 20 chunks and submitted as independent PBS jobs; walltime and exit codes are logged. The CP arms share a single constructed pool: CP-pool+SA applies the same SA sampler to it, and CP-pool+IPU applies the same IPU implementation.
 
 \subsubsection{Positioning against established synthesizers}
 \label{sec:external_baselines}
@@ -359,7 +359,7 @@ treated as a black-box replacement for the present zone-fitting experiment.
 
 The following external-baseline protocol is defined for a like-for-like comparison.
 PopulationSim (and, where its data interface permits, the POLARIS population stage)
-must receive the same seed households/persons, geography, 11 control tables, target
+must receive the same seed households and persons, geography, 11 control tables, target
 population, and random-seed policy as the proposed method. Each method must return
 linked person and household tables. Every output is then scored on the same per-zone
 marginal TVD and SRMSE, pairwise Cram\'{e}r's $V$ error, household consistency, unseen
@@ -540,15 +540,10 @@ CP + MIP + HHTS   & 1{,}463{,}817 & 569{,}024 & 1{,}161{,}715 & 2{,}909 & 2{,}52
 \end{tabular}
 \end{table}
 
-Figure~\ref{fig:pool_before_after} makes the same point at zone level. In the
-worked zone, most target cells without a carrier become selectable after
-expansion while the slice grows only slightly; the cell that remains is a
-structural code. Expansion therefore changes what the fitter can reach far more
-than it changes how much material it has.
-
-\input{files/pool_before_after.tex}
-
-Table~\ref{tab:pool_support_stats} puts the same result on a cohort basis.
+Expansion changes what the fitter can reach far more than it changes how much
+material it has: the added households are a small share of the pool but they
+make individually decisive cells selectable. Table~\ref{tab:pool_support_stats}
+puts that on a cohort basis.
 Only a small share of positive-target control cells are unreachable in the base
 slice, expansion covers most of those, and the residual cells lie in three codes
 and carry a negligible share of target units. The intervention is therefore
@@ -626,15 +621,52 @@ MIP+IPU (comp.) & CP + composition filter & IPU & 367 & 0.302 & 0.196 & Complete
 
 \textbf{The pool effect under a fixed fitter.} Table~\ref{tab:pool_fitter_matrix} separates the pool effect from the fitter effect. With the fitter held at IPU, the constructed pool lowers both the mean and the median relative to IPU-Only. With the fitter held at SA, the constructed pool is close to SA-Only, while the full-menu MIP append is worse; when the appended menu is composition-filtered, the SA arm matches SA-Only and improves its median. The clean pool contrast is therefore CP-only+IPU against IPU-Only, which share one zone set and differ only by the constructed pool. The constructed pool also differs from the raw microdata in size and composition as well as feasibility, so that pair identifies the pool as a whole rather than the feasibility property alone.
 
-\textbf{The one-MIP arm.} CP-MIP replaces the selection/weighting fitter with one integer program per zone. It chooses an integer replication count for every candidate household in the zone's SA4 slice, minimising missed control cells first and table deviations second, with a pool-anchored soft block for joint and uncontrolled attributes. Table~\ref{tab:pool_fitter_matrix} shows that it has the lowest median RSSZ of any arm, although its mean is not the lowest: two zones return a 120-second incumbent and carry most of its tail. Table~\ref{tab:full_audit} shows the cost, with the highest within-zone duplication and joint TVD, so the marginal median is bought by replication rather than a richer joint structure. A 19-zone sweep shows that the in-sample optimum is not the held-out optimum; the released sweep summary reports the grid, and the reported arm uses a middle setting.
+\textbf{The one-MIP arm.} CP-MIP replaces the selection/weighting fitter with one integer program per zone. It chooses an integer replication count for every candidate household in the zone's SA4 slice, minimising missed control cells first and table deviations second, with a pool-anchored soft block for joint and uncontrolled attributes. Table~\ref{tab:pool_fitter_matrix} shows that it has the lowest median RSSZ of any arm, although its mean is not the lowest: two zones return a 120-second incumbent and carry most of its tail. Table~\ref{tab:full_audit} shows the cost, with the highest within-zone duplication and joint TVD, so the marginal median is bought by replication rather than a richer joint structure. A 19-zone sweep shows that the in-sample optimum is not the held-out optimum; the released sweep summary reports the grid, and the reported arm uses a middle setting. The same sweep
+identifies the duplication lever: the within-zone identical-person share falls
+monotonically as the replication cap is lowered, while the joint-weight setting
+barely changes it, so the held-out-winning setting is also the least duplicating
+one tested. No cap removes duplication entirely; replication is what buys the
+marginal fit, and penalising duplicate tuples directly in the objective remains
+future work.
+
+The construction and expansion stages do not fit zone totals: the pool is built
+once over the whole census, and the expansion step only restores cells that a
+zone's slice cannot supply. Zone marginals enter at fitting, and in the one-MIP
+arm they enter as explicit constraints over every candidate household, with
+missed cells counted and penalised ahead of deviation. The division is
+deliberate: putting 367 different zone targets into a pool built once would make
+the pool zone-specific and duplicate the fitter. Where the pool cannot source a
+cell, the miss count in the released CP-MIP summary records it, and those misses
+concentrate in the same pool-gap zones as the SA tail in
+Table~\ref{tab:pathological_zones}.
 
 Table~\ref{tab:pathological_zones} isolates the zones where the constructed-pool fitters fail. In 302031036 the pool lacks the dwelling records needed for \texttt{rntrd}, \texttt{mrerd} and \texttt{vehrd}; in 112011237 the failure is the household-size trade-off discussed above. The zones are pool gaps, not evidence about the fitter, and remain in the cohort means.
 
 \input{files/pathological_zones.tex}
 
-Table~\ref{tab:cp_sa_tail} separates search budget from pool composition on the worst MIP+SA zones. A longer seeded run improves four of the five; the fifth remains the pathological pool gap. The tail is therefore partly budget- and initialization-limited.
+Table~\ref{tab:cp_sa_tail} separates search budget from pool composition on the worst MIP+SA zones. A longer seeded run improves four of the five; the fifth, the pathological pool gap, is worse under the seed because the pool cannot source its dwelling cells. The tail is therefore partly budget- and initialization-limited.
 
 \input{files/cp_sa_tail.tex}
+
+\textbf{Scaling with zone size.} \cref{fig:zone_size} splits the fitted cohort
+into census-population quintiles. The rank order of the arms barely moves across
+the size range: SA-Only's median is nearly flat in size, CP-MIP's advantage over
+it holds in every quintile, and the CP-only + SA arms lose ground only in the
+largest quintile. Win rates against SA-Only track the same pattern, so the
+pool-to-pool conclusions above are not an artefact of zone mix.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_zone_size.png}
+\caption{Scaling with zone size on the fitted cohort, grouped into
+census-population quintiles from smallest (Q1) to largest (Q5).
+\textbf{(a)} Median 11-table RSSZ per quintile for SA-Only, IPU-Only,
+CP-only + SA, the composition-filtered pool + SA, and CP-MIP.
+\textbf{(b)} The share of zones in each quintile that beat SA-Only.
+The rank order is stable across the size range; the per-zone values behind the
+figure are released with the code.}
+\label{fig:zone_size}
+\end{figure}
 
 \FloatBarrier
 
@@ -647,43 +679,40 @@ Four distinct outcome families are therefore reported: (i) marginal fit,
 (ii) joint association preservation, (iii) household consistency and diversity, and
 (iv) feasibility, failure rate, and computational cost. A method is not treated as
 an overall improvement when it wins one family while materially degrading another.
+Figure~\ref{fig:fit_example} illustrates (i) on one mid-cohort zone: how the arms
+rank there, and which tables carry the residual that the one-MIP fit removes.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{fig4_marginals_by_arm.png}\caption{Synthesised versus true census marginals for the \texttt{heap} (highest educational
-attainment) control table, on the 60-zone cohort on which all four arms are available.
-Each category shows five bars: the census target (grey) followed by SA-Only, IPU-Only,
-CP-pool+SA and CP-pool+IPU. A level set of bars reproduces the marginal; a gap is a
+attainment) control table, on the fitted cohort on which all five arms are available.
+Each category shows six bars: the census target (grey) followed by SA-Only, IPU-Only,
+CP-pool+SA, CP-pool+IPU and CP-MIP. A level set of bars reproduces the marginal; a gap is a
 shortfall or an overshoot. The Not applicable category (code 11) and the effectively empty
 code 12 are excluded because they dominate or add nothing to the remaining categories;
 they are reported in the accompanying table instead. The consistent feature across every
 arm is a property of the pool rather than of the fitter: the Certificate I \& II level is
 under-produced everywhere, because the fused microdata contains almost no records at that
-level. Total-variation distances for all nineteen in-sample control tables are summarised
-in Figure~\ref{fig:marginals_all_tables}.}
+level. CP-MIP's Yr 10+ overshoot and Cert I \& II residual are the replication cost
+discussed in \cref{tab:full_audit}. Total-variation distances for all nineteen in-sample
+control tables are summarised in Figure~\ref{fig:marginals_all_tables}.}
 \label{fig:marginal_differences}
 \end{figure}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{fig_fit_example.png}
-\caption{Worked example of the fitting process for one SA2 zone (301011004)
-under MIP+SA. \textbf{Left:} the annealing trace at 200-iteration
-checkpoints; the objective is the RSSZ sum over the nineteen control tables.
-The solid line is the current solution and the dashed line the best seen so
-far. At this sampling resolution the two coincide at all five checkpoints,
-but the chain is not a monotone descent: it accepted 575 moves, of which 441
-improved the objective and 134 did not. The 200-iteration checkpoints hide
-those accepted non-improving moves. The auto-calibrated temperature
-is small because the measured cost of a worsening swap is of order $10^{-4}$,
-so the excursions are local and the best solution plateaus early; the
-remaining budget buys little, but the chain is a genuine annealer rather than
-a greedy descent. \textbf{Right:} the per-table decomposition of the same
-zone's final residual. Dark bars are dwelling-level tables, light bars
-person-level tables; the dotted line marks an RSSZ of 0.1. The largest
-residuals are person-level (\texttt{hrsp} 0.17, \texttt{typp} 0.15,
-\texttt{mtwp} 0.11, \texttt{indp} 0.09); every dwelling-level table is below
-0.03. The example is a single zone and is illustrative of the
-error pattern, not a cohort-level estimate.}
+\caption{Worked example on one mid-cohort SA2 zone (301011004), chosen as a
+typical zone rather than the tail. \textbf{(a)} The 11-table RSSZ of every arm
+on this zone, in pipeline order: the first two fit raw microdata directly, the
+CP-pool arms fit the constructed pool, and CP-MIP replaces the fitter with one
+integer program. \textbf{(b)} The same zone's per-table residuals under
+CP-pool + SA and CP-MIP on the 19-table fitting objective, sorted by the SA
+arm's value. The one-MIP fit concentrates its gains on the tables where the
+annealer's residual sits, at the cost of small residual increases on tables the
+SA arm had already zeroed; that trade-off is what the integer program's
+hierarchical objective buys. The zone is illustrative of the mechanism, not a
+cohort estimate; cohort values are in Tables~\ref{tab:pool_fitter_matrix} and
+\ref{tab:full_audit}.}
 \label{fig:fit_example}
 \end{figure}
 
@@ -780,18 +809,31 @@ The \gls{sa} algorithm runs 1{,}000 iterations per zone. The initial temperature
 
 Attribute mutation is the one place in the SA path where a move could in principle leave the feasible set, and it is bounded so that it cannot: the re-labelling is restricted to applicable categories for the person's age, and a family move assigns a single value to every member. The CP route makes this explicit rather than relying on the move set, because its records are constructed inside the rule set before any fit begins.
 
-Figure~\ref{fig:sa_convergence} separates convergence from final fit. SA-Only starts from a better incumbent and is essentially flat early; the constructed-pool runs start worse and leave more of the fit to the search budget. Over the common zones, the raw SA run is close to its final value much earlier, while the MIP-pool run is still improving late in the schedule. The composition-aware trace is higher on the 19-table objective because it includes tables outside the 11-table reporting basis; its marginal result is the one in Table~\ref{tab:expansion_composition}. This is a convergence contrast, not a claim that more iterations close the gap: the tail test above shows that a longer seeded run improves most of the worst zones but not the pathological one.
+Figure~\ref{fig:sa_convergence} separates convergence from final fit. Every pool
+variant is built once---the MIP is a single deterministic solve with no iteration
+budget---and then fitted by the same SA annealer, so the figure's horizontal axis
+measures annealing budget only. SA-Only begins near its incumbent and is
+essentially settled early; the constructed-pool runs start further from their
+finals and spend more of the budget, which is visible in both the single-zone
+trace and the cohort-wide median. The composition-aware trace is higher on the
+19-table objective because it includes tables outside the 11-table reporting
+basis; its marginal comparison is Table~\ref{tab:expansion_composition}. This is
+a convergence contrast, not a claim that more iterations close the fit gap: the
+tail test above shows that a longer seeded run improves most of the worst zones
+but not the pathological one.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{fig_sa_convergence.png}
-\caption{Convergence rather than final fit. \textbf{(a)} Best RSSZ for zone
-301011004 at the 200-iteration checkpoints under SA-Only, the current MIP pool,
-the coverage-only MIP pool and the composition-aware MIP pool, on a log scale.
-\textbf{(b)} The same checkpoints over the 290 zones common to the runs; each
-zone's best RSSZ is divided by its own value at iteration 1{,}000, and the
-lines and bands are the median and interquartile range. Values are the 19-table
-RSSZ used by the fitting objective, not the 11-table reporting metric.}
+\caption{Convergence rather than final fit. \textbf{(a)} The SA annealer's best
+RSSZ for zone 301011004 at the 200-iteration checkpoints, linear scale. Each
+line is the same fitter over a different candidate pool; the pools themselves
+are built once, so the axis is annealing budget, not pool-builder budget.
+\textbf{(b)} The zones common to the four runs; each zone's best RSSZ at a
+checkpoint is divided by that zone's own final value, and lines and bands are
+the median and interquartile range. SA-Only is closest to its final state
+throughout; the constructed-pool runs spend more of the schedule descending.
+Values are the 19-table fitting objective, not the 11-table reporting metric.}
 \label{fig:sa_convergence}
 \end{figure}
 
@@ -960,7 +1002,8 @@ census's rather than a reassembled one.
 \label{sec:appendix_marginals}
 Figure~\ref{fig:marginals_all_tables} reports, for every in-sample control table, the
 total-variation distance between the pooled census marginal and the pooled marginal of each
-arm on the 60-zone cohort on which all four arms are available. The distance is computed
+arm on the 367-zone fitted cohort, which is the 19-table fitting basis rather than the
+11-table reporting basis. The distance is computed
 from the category shares, not as a mean of per-zone RSSZ, so it describes the shape of the
 cohort-level distribution and is not a substitute for the zone-level results. The largest
 pooled discrepancy is \texttt{qalfp}, which is the coding offset between the raw and
@@ -972,7 +1015,8 @@ replication package under \texttt{outputs/paper\_figures/}.
 \centering
 \includegraphics[width=\textwidth]{fig_marginals_all_tables.png}
 \caption{Total-variation distance between the pooled census marginal and each arm's pooled
-marginal, by in-sample control table, on the 60-zone cohort. Lower is better. The census is
+marginal, by in-sample control table, on the 367-zone fitted cohort. Lower is better. This
+panel uses the 19-table fitting basis, not the 11-table reporting basis. The census is
 the zero baseline and is not drawn. \texttt{qalfp} is dominated by the coding offset
 between the raw and constructed-pool routes: the raw arms place the modal category at a
 different code, so their distance is near 0.5 even though the remaining categories are
@@ -983,7 +1027,7 @@ close.}
 \subsection{Available broader validation}
 \label{sec:appendix_available_validation}
 The main text reports only the 11 control tables shared by the completed arms.
-For transparency, the following records the held-out validation for all four arms on the
+For transparency, the following records the held-out validation for all five arms on the
 367-zone cohort they share. It is not used in the primary comparison. The table below
 reports the seven held-out control tables. Figure~\ref{fig:heldout_tvd} summarises the six
 tables every arm supports, and Figures~\ref{fig:heldout_categories_person}--
@@ -999,36 +1043,36 @@ every member row.
 
 \begin{table}[h!]
 \centering
-\caption{Held-out performance by table for all four arms on the 367-zone matched cohort
+\caption{Held-out performance by table for all five arms on the 367-zone matched cohort
 (\texttt{lfsp}: 259 zones, the SA2s whose control table carries labour-force status).
 Entries are mean per-zone total-variation distance; lower is better. These are marginal
 concordances for structures the fitter never optimised against: the seven tables were
 excluded from the fitting basis by design, so agreement here measures structure that
 survives a fit rather than structure that was targeted. The raw populations do not carry
-\texttt{families\_in\_household}, so \texttt{hcfmf} is reported for the two
-constructed-pool arms only.}
+\texttt{families\_in\_household}, so \texttt{hcfmf} is reported for the constructed-pool
+arms only.}
 \label{tab:heldout}
 \footnotesize
 \setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{@{}lrrrr@{}}
+\begin{tabular}{@{}lrrrrr@{}}
 \toprule
-\textbf{Held-out table} & \textbf{SA-Only} & \textbf{IPU-Only} & \textbf{CP-SA} & \textbf{CP-IPU} \\
+\textbf{Held-out table} & \textbf{SA-Only} & \textbf{IPU-Only} & \textbf{CP-SA} & \textbf{CP-IPU} & \textbf{CP-MIP} \\
 \midrule
-age5p (age by 5-year group)          & 0.109 & 0.146 & 0.130 & 0.140 \\
-assnp (need for assistance)          & 0.038 & 0.047 & 0.038 & 0.040 \\
-bedrd (bedrooms)                     & 0.223 & 0.235 & 0.222 & 0.233 \\
-hcfmf (family composition)           & n/a   & n/a   & 0.040 & 0.057 \\
-hhcd (household composition)         & 0.144 & 0.190 & 0.140 & 0.197 \\
-lfsp (labour force status)           & 0.341 & 0.387 & 0.350 & 0.388 \\
-tenlld (landlord type)               & 0.181 & 0.190 & 0.176 & 0.182 \\
+age5p (age by 5-year group)          & 0.109 & 0.146 & 0.130 & 0.140 & 0.111 \\
+assnp (need for assistance)          & 0.038 & 0.047 & 0.038 & 0.040 & 0.027 \\
+bedrd (bedrooms)                     & 0.223 & 0.235 & 0.222 & 0.233 & 0.171 \\
+hcfmf (family composition)           & n/a   & n/a   & 0.040 & 0.057 & 0.078 \\
+hhcd (household composition)         & 0.144 & 0.190 & 0.140 & 0.197 & 0.154 \\
+lfsp (labour force status)           & 0.341 & 0.387 & 0.350 & 0.388 & 0.346 \\
+tenlld (landlord type)               & 0.181 & 0.190 & 0.176 & 0.182 & 0.119 \\
 \bottomrule
 \end{tabular}
 
 \par\smallskip
-{\footnotesize\textit{Note:} The matched cohort is the 367 SA2 zones on which all four
+{\footnotesize\textit{Note:} The matched cohort is the 367 SA2 zones on which all five
 arms produced a population; \texttt{lfsp} is scored on the 259 of those whose SA2 control
 table carries labour-force status. The two raw arms lack \texttt{families\_in\_household}, so the
-\texttt{hcfmf} row has no raw-arm entries; the constructed-pool arms do carry the source
+\texttt{hcfmf} row has no raw-arm entries; the constructed-pool arms carry the source
 column. \texttt{age5p} was previously reported at 1.000 because the control table's labels
 were flattened to band lower bounds; mapping them back to the five-year labels and deriving
 the synthetic side from \texttt{agep} yields the values above. \texttt{tenlld} aligns the
@@ -1066,9 +1110,9 @@ Figure~\ref{fig:heldout_categories_dwelling}(b).}
 \includegraphics[width=\textwidth]{fig_heldout_categories_person.png}
 \caption{Category-level held-out marginals for the person-carried control tables, pooled
 over the matched cohort. Each category shows the census target (grey) followed by SA-Only,
-IPU-Only, CP-pool+SA and CP-pool+IPU. (a) Age bands follow the ABS five-year groups
+IPU-Only, CP-pool+SA, CP-pool+IPU and CP-MIP. (a) Age bands follow the ABS five-year groups
 and are labelled by their bounds. (b) Need-for-assistance categories are the ABS census
-codes. (c) Labour-force status is shown on the 260 zones whose SA2 control table carries
+codes. (c) Labour-force status is shown on the 259 zones whose SA2 control table carries
 it. A level set of bars reproduces the marginal; the aggregate distances are in
 Table~\ref{tab:heldout}.}
 \label{fig:heldout_categories_person}
@@ -1079,8 +1123,8 @@ Table~\ref{tab:heldout}.}
 \includegraphics[width=\textwidth]{fig_heldout_categories_dwelling.png}
 \caption{Held-out category profiles for the dwelling and family-composition tables.
 (a) Bedrooms. (b) Family household composition. The two raw populations do not carry
-\texttt{families\_in\_household}, so panel (b) shows the census and the two
-constructed-pool arms only; the legend lists all four arms because panel (a) uses them.}
+\texttt{families\_in\_household}, so panel (b) shows the census and the three
+constructed-pool arms only; the legend lists all five arms because panel (a) uses them.}
 \label{fig:heldout_categories_dwelling}
 \end{figure}
 
@@ -1089,7 +1133,7 @@ constructed-pool arms only; the legend lists all four arms because panel (a) use
 \includegraphics[width=\textwidth]{fig_heldout_categories_household.png}
 \caption{Held-out category profiles for the household tables. (a) Household composition.
 (b) Landlord type, where the x-axis shows the ABS census category codes and category 9 is
-``Not applicable''. Both panels are drawn for the census and all four arms on the 367-zone
+``Not applicable''. Both panels are drawn for the census and all five arms on the 367-zone
 matched cohort.}
 \label{fig:heldout_categories_household}
 \end{figure}

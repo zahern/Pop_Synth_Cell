@@ -68,10 +68,10 @@ ARMS = {
     "ipu_gan":  [getattr(config, "IPU_GAN_RESULTS_DIR", _dir("ipu_gan_results"))],
     # CP-SA writes one sub-directory per chunk, so search recursively.
     "cp_sa":    [getattr(config, "CP_POOL_RESULTS_DIR", _dir("cp_pool_results"))],
-    "cp_ipu":   [os.path.join(config.OUTPUTS_DIR, "cp_ipu_results_v6"),
-                 getattr(config, "CP_IPU_RESULTS_DIR", _dir("cp_ipu_results"))],
-    "cp_mip":   [os.path.join(config.OUTPUTS_DIR, "cp_mip_results_v6"),
-                 getattr(config, "CP_MIP_RESULTS_DIR", _dir("cp_mip_results"))],
+    "cp_ipu":   [getattr(config, "CP_IPU_RESULTS_DIR", _dir("cp_ipu_results")),
+                 os.path.join(config.OUTPUTS_DIR, "cp_ipu_results_v6")],
+    "cp_mip":   [getattr(config, "CP_MIP_RESULTS_DIR", _dir("cp_mip_results")),
+                 os.path.join(config.OUTPUTS_DIR, "cp_mip_results_v6")],
 }
 
 ARM_COLOURS = {
@@ -268,6 +268,13 @@ def main():
 
     # Shared cohort: zones every included arm completed.
     shared = set.intersection(*[set(f) for f in files.values()])
+    # Restrict to the paper's 367-zone fitted cohort, so the marginal figures
+    # and the tables are computed on the same zone set.
+    cohort_path = os.path.join(HERE, "pbs", "zones_371.txt")
+    if os.path.exists(cohort_path):
+        scope = {ln.strip() for ln in open(cohort_path) if ln.strip()}
+        excluded = {"301031014", "304041102", "310021279", "311031315"}
+        shared = shared & (scope - excluded)
     shared = sorted(shared)
     if a.cohort:
         shared = shared[: a.cohort]

@@ -22,7 +22,7 @@ fits each SA2 zone by simulated annealing (SA), iterative proportional updating
 | 2 | Optional composition filter on the appended menu | `make_composition_aware_pool.py` |
 | 3 | Fit every SA2 zone (SA / IPU / integer-count MIP) | `cp_pool_sa.py`, `cp_pool_ipu.py`, `cp_pool_mip.py` |
 | 4 | Score the arms on the shared tables and the 367-zone cohort | `score_paper_arms.py` |
-| 5 | Joint / diversity audit, held-out validation | `full_cohort_audit.py`, `heldout_rssz.py`, `make_fig_heldout.py` |
+| 5 | Joint / diversity audit, held-out validation, CP-MIP sweep | `full_cohort_audit.py`, `heldout_rssz.py`, `make_fig_heldout.py`, `append_cp_mip_heldout.py`, `sweep_identity.py` |
 | 6 | Paper figures and boards | `make_*.py`, `paper_figures.py` |
 
 The PBS scripts in `pbs/` are the exact jobs used for the paper; the
@@ -117,7 +117,10 @@ bash submit_cp_mip.sh
 python score_paper_arms.py --latex
 python full_cohort_audit.py
 python make_fig_heldout.py
+python append_cp_mip_heldout.py
 python heldout_rssz.py
+python sweep_identity.py
+python make_zone_size_fig.py
 ```
 
 All reported numbers are computed on the same 367 zones and, for the main

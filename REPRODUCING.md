@@ -74,7 +74,10 @@ expansion variants (coverage-only, composition) are selected by
 python score_paper_arms.py --latex       # Tables 9 and 11, 11-table RSSZ
 python full_cohort_audit.py              # joint TVD, |Delta V|, clone audit
 python make_fig_heldout.py               # held-out TVD table and figures
+python append_cp_mip_heldout.py          # add the CP-MIP arm to the held-out suite
 python heldout_rssz.py                   # held-out RSSZ by table
+python sweep_identity.py                 # duplication across the CP-MIP sweep
+python make_zone_size_fig.py             # zone-size scaling figure
 ```
 
 `score_paper_arms.py` reads the per-zone summaries written by the fitters
@@ -95,7 +98,7 @@ column order. `full_cohort_audit.py` reads the released populations.
 | `tab:cp_sa_tail` | tail-run summaries (`outputs/cp_pool_results*`, 5,000 iterations) | `files/cp_sa_tail.tex` |
 | `tab:pathological_zones` | `score_paper_arms.py` per-zone CSV | `outputs/paper_arms/paper_arms_zones.csv` |
 | `tab:full_audit` | `full_cohort_audit.py` | `outputs/full_cohort_audit/full_cohort_audit.csv` |
-| `tab:heldout` | `make_fig_heldout.py` | `outputs/paper_figures/heldout_tvd_summary.csv` |
+| `tab:heldout` | `make_fig_heldout.py` + `append_cp_mip_heldout.py` | `outputs/paper_figures/heldout_tvd_summary.csv` |
 | `tab:pool_expansion_audit` | `make_paper_boards.py` from `outputs/expansion_shards/*.report.json` | `files/pool_expansion_table.tex` |
 | `tab:control_codebook`, `tab:hh_handling`, `tab:heap_categories` | hand-written | — |
 | `tab:known-methods-comparison` | conceptual comparison, hand-written | — |
@@ -108,16 +111,22 @@ column order. `full_cohort_audit.py` reads the released populations.
 | `fig:flow`, `fig:cp_pool`, `fig:mip-expansion-process`, `fig:missing-cells-framework`, `fig:donor_chromosome` | TikZ in `files/*.tex` | compiled PDF |
 | `fig:expansion_board` | `make_paper_boards.py` | `files/fig_board_expansion.pdf` |
 | `fig:zero_cell_coverage` | `paper_figures.py` | `zero_cell_coverage.png` |
-| `fig:pool_before_after` | `make_pool_before_after_fig.py` | `fig_pool_before_after.png` |
+| `fig:zone_size` | `make_zone_size_fig.py` | `fig_zone_size.png` |
 | `fig:pool_gain_ipu`, `fig:pool_gain_sa` | `make_pool_gain_plot.py` | `fig_pool_gain_ipu.png`, `fig_pool_gain_sa.png` |
 | `fig:marginals_all_tables` | `make_marginal_histograms.py` | `fig_marginals_all_tables.png` |
 | `fig:marginal_differences` | `make_fig_all_variables.py` / `make_fig4.py` | `fig4_marginals_by_arm.png` |
 | `fig:fit_example` | `make_fit_example.py` | `fig_fit_example.png` |
 | `fig:sa_convergence` | `make_sa_convergence.py` | `fig_sa_convergence.png` |
-| `fig:heldout_tvd` and `fig:heldout_categories_*` | `make_fig_heldout.py` | `fig_heldout_*.png` |
+| `fig:heldout_tvd` and `fig:heldout_categories_*` | `make_fig_heldout.py` + `append_cp_mip_heldout.py` | `fig_heldout_*.png` |
 
 ## Notes and known limitations
 
+- **Control-table basis.** Two bases are used. The fitting objective uses all 19
+  in-sample control tables; the primary arm comparison (`tab:expansion_composition`,
+  `tab:pool_fitter_matrix`) uses the 11 tables shared by every arm. Pool-support
+  statistics, the per-table marginal diagnostics and the all-table TVD figure use
+  the 19-table basis. Every caption states its basis; rows from the two bases are
+  not mixed in one comparison.
 - **`tab:matched-method-results` (60-zone empirical comparison).** The
   generator for this table is not in this repository; its numbers should be
   recomputed from the 60-zone outputs before the table is used in a release.

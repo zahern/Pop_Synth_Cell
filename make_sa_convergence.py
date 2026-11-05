@@ -1,7 +1,13 @@
 """Convergence of SA on raw microdata vs the constructed/extended pool.
 
-Panel A: one zone (301011004), best RSSZ at the 200-iteration checkpoints.
-Panel B: all zones common to both runs, each zone's best RSSZ divided by its
+The x-axis is the SA annealer's iteration budget in every panel: each pool is
+built once (MIP-expanded, coverage-only, or composition-aware) and then fitted
+by the same SA implementation, so the curves differ only in the pool they
+anneal. The MIP itself is a single solve and has no iterations.
+
+Panel A: one zone (301011004), best RSSZ at the 200-iteration checkpoints,
+linear scale.
+Panel B: all zones common to the runs, each zone's best RSSZ divided by its
 own final best, summarised by the median and interquartile band.
 """
 import glob
@@ -23,11 +29,11 @@ PAT = re.compile(r"Zone (\d+): iter (\d+)/1000\s+RSSZ=([0-9.]+)\s+best=([0-9.]+)
 
 RUNS = {
     "SA-Only": sorted(glob.glob(os.path.join(HERE, "s3b_c*.o27308*"))),
-    "MIP current": sorted(glob.glob(os.path.join(
+    "CP-pool + SA": sorted(glob.glob(os.path.join(
         HERE, "pbs_logs", "non_gan_fitters_v3", "cp_sa_*.log"))),
-    "MIP coverage": sorted(glob.glob(os.path.join(
+    "Coverage pool + SA": sorted(glob.glob(os.path.join(
         HERE, "pbs_logs", "coverage_fitters", "cp_sa_*.log"))),
-    "MIP composition": sorted(glob.glob(os.path.join(
+    "Composition pool + SA": sorted(glob.glob(os.path.join(
         HERE, "pbs_logs", "composition_fitters", "cp_sa_*.log"))),
 }
 
@@ -47,25 +53,27 @@ def main():
     for arm, df in data.items():
         print(arm, "zones", df.zone.nunique(), "rows", len(df))
 
-    # Panel A: one zone
     fig, (axA, axB) = plt.subplots(
         1, 2, figsize=(11, 4.2), gridspec_kw={"width_ratios": [1, 1.15]})
-    colors = {"SA-Only": "#1b6ca8", "MIP current": "#d68910",
-              "MIP coverage": "#8e44ad", "MIP composition": "#2e8b57"}
+    colors = {"SA-Only": "#1b6ca8", "CP-pool + SA": "#d68910",
+              "Coverage pool + SA": "#8e44ad",
+              "Composition pool + SA": "#2e8b57"}
+
+    # Panel A: one zone, linear scale. The four traces sit at clearly
+    # different levels, so no log axis is needed.
     for arm, df in data.items():
         tr = df[df.zone.astype(str) == ZONE].sort_values("iteration")
-        axA.plot(tr.iteration, tr.best, marker="o", linewidth=1.8,
-                 color=colors[arm], label=arm)
-    axA.set_yscale("log")
-    axA.set_xlabel("iteration")
+        axA.plot(tr.iteration, tr.best, marker="o", markersize=5,
+                 linewidth=1.8, color=colors[arm], label=arm)
+    axA.set_xlabel("SA iteration checkpoint")
     axA.set_ylabel("best RSSZ (sum over 19 tables)")
     axA.set_xticks([200, 400, 600, 800, 1000])
-    axA.legend(frameon=False, fontsize=8.5)
-    axA.set_title(f"Zone {ZONE}", fontsize=10)
+    axA.set_ylim(0, None)
+    axA.legend(frameon=False, fontsize=8)
     for sp in ("top", "right"):
         axA.spines[sp].set_visible(False)
 
-    # Panel B: common zones, normalised to each zone's final best
+    # Panel B: common zones, normalised to each zone's own final best.
     common = set.intersection(*[
         set(df.loc[df.iteration == 1000, "zone"]) for df in data.values()])
     print("common zones", len(common))
@@ -79,23 +87,25 @@ def main():
         med = norm.median(axis=0)
         q25 = norm.quantile(0.25, axis=0)
         q75 = norm.quantile(0.75, axis=0)
-        axB.plot(med.index, med.values, marker="o", linewidth=1.8,
-                 color=colors[arm],
-                 label=f"{arm} (median final {final.median():.3f})")
-        axB.fill_between(med.index, q25.values, q75.values,
+        med_index = med.index.to_numpy()
+        print(arm, "median ratios", med.round(3).to_dict())
+        axB.plot(med_index, med.values, marker="o",
+                 markersize=5, linewidth=1.8, color=colors[arm], label=arm)
+        axB.fill_between(med_index, q25.values, q75.values,
                          color=colors[arm], alpha=0.16, linewidth=0)
     axB.axhline(1.0, color="#555555", linewidth=0.8, linestyle=":")
-    axB.set_xlabel("iteration")
-    axB.set_ylabel("best RSSZ / final best RSSZ")
+    axB.set_xlabel("SA iteration checkpoint")
+    axB.set_ylabel("best RSSZ / zone's final best")
     axB.set_xticks([200, 400, 600, 800, 1000])
-    axB.legend(frameon=False, fontsize=8.5)
-    axB.set_title(f"All common zones (n={len(common)})", fontsize=10)
+    axB.set_ylim(0.99, None)
+    axB.set_xlim(150, 1050)
+    axB.legend(frameon=False, fontsize=8)
     for sp in ("top", "right"):
         axB.spines[sp].set_visible(False)
 
     fig.tight_layout()
     out = os.path.join(FIG_DIR, "fig_sa_convergence.png")
-    fig.savefig(out, dpi=200, bbox_inches="tight")
+    fig.savefig(out, dpi=220, bbox_inches="tight")
     plt.close(fig)
     print("wrote", out)
 

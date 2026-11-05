@@ -9,6 +9,7 @@ cohort:
 
 Outputs outputs/full_cohort_audit/full_cohort_audit.csv.
 """
+import argparse
 import glob
 import os
 import re
@@ -94,6 +95,11 @@ def pair_dist(df, a, b):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--arms", nargs="*", default=None,
+                    help="run only these arm keys (default: all)")
+    ap.add_argument("--out", default=os.path.join(OUT, "full_cohort_audit.csv"))
+    args = ap.parse_args()
     zones = cohort()
     csf = pd.read_csv(CSF)
     csf["sa2"] = csf["sa2"].astype(str)
@@ -128,6 +134,8 @@ def main():
 
     rows = []
     for arm, root in ARMS.items():
+        if args.arms and arm not in args.arms:
+            continue
         files = map_files(root, arm)
         have = [z for z in zones if z in files]
         print(f"{arm}: {len(have)}/{len(zones)} populations", flush=True)
@@ -215,9 +223,9 @@ def main():
         print(rows[-1], flush=True)
 
     out = pd.DataFrame(rows)
-    out.to_csv(os.path.join(OUT, "full_cohort_audit.csv"), index=False)
+    out.to_csv(args.out, index=False)
     print(out.round(4).to_string(index=False))
-    print("wrote", os.path.join(OUT, "full_cohort_audit.csv"))
+    print("wrote", args.out)
 
 
 if __name__ == "__main__":

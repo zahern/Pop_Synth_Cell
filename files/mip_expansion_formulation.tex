@@ -98,7 +98,9 @@ support block is enabled by default. When it is on, the following constraints
 define the admitted set used by the zone program below and the admitted pool is
 \(\mathcal{J}_z^{+}=\{j\in\mathcal{J}_z:y_j=1\}\); when it is off, the block is
 omitted and \(\mathcal{J}_z^{+}=\mathcal{H}_z\), so the fit has no access to
-any constructed record. The block adds no objective term.
+any constructed record. The block is a separate admission program with its own
+objective, \eqref{eq:mip_joint_objective}; it adds no term to the zone fitter's
+objective \eqref{eq:objective}.
 \begin{equation}
 \begin{aligned}
 & \sum_{j\in\mathcal{J}_z} a_{j,c}\,y_j+e_c\ge \nu_c,
@@ -117,18 +119,36 @@ any constructed record. The block adds no objective term.
 \end{aligned}
 \label{eq:mip_joint}
 \end{equation}
+The block's own criterion is
+\begin{equation}
+\min_{y,e,d}\;\;
+\lambda_0\sum_{c\in\mathcal{Z}_z^0} e_c
+\;+\;\sum_{k\in\mathcal{K}}\sum_{m\in\mathcal{M}_k} w_{k,m}\,d_{k,m}
+\;+\;\lambda_1\sum_{j\in\mathcal{J}_z} y_j ,
+\label{eq:mip_joint_objective}
+\end{equation}
+with $\lambda_0$ large enough that coverage dominates, so the program first
+covers sourceable zero cells, then chooses among coverage-equivalent sets by
+weighted marginal deviation, and uses $\lambda_1$ only to break remaining ties
+toward fewer admitted households. This is a construction criterion, not a second
+minimisation of the fitted population: \eqref{eq:mip_joint_objective} is solved
+once to fix \(\mathcal{J}_z^{+}\), and the zone fitter then minimises
+\eqref{eq:objective} over that set.
+
 The support variable \(y_j\) governs admission to the candidate set, not use in
 the fitted population: \(y_j=1\) makes candidate \(j\) available to the zone
-fitter, which then selects from that set with \(x_{i,h}\). The slack \(e_c\)
+fitter, which then selects from that set with \(x_{i,h}\). Each admitted unit is
+a whole constructed household, not an isolated person: its \(s_j\) members enter
+together with the shell's family roles, household composition and dwelling
+fields, and the household has already passed the eleven whole-household rules.
+The number of added persons is therefore \(\sum_j s_j y_j\), which the budget row
+caps at \(P_z^{\mathrm{add}}\); the carrier rows count those members for
+person-level tables and the household once for household-level tables. Filling a
+zero cell is thus a statement about a household that carries a relationship
+structure, not about a free-floating individual. The slack \(e_c\)
 absorbs any shortfall below the carrier requirement, and \(d_{k,m}\) records the
 admitted set's deviation from the zone's marginal shares; neither appears in
-\eqref{eq:objective}. Among feasible support sets the implementation prefers
-lower coverage slack, then lower marginal deviation, then fewer admitted
-households, and scalarises that preference internally as
-$\lambda_0\sum_c e_c+\sum_{k,m}w_{k,m}d_{k,m}+\lambda_1\sum_j y_j$, with
-$\lambda_0$ large enough that coverage dominates. That scalarisation is a
-construction tie-break inside the block, not a second minimisation of
-the fitted population, and it does not compete with RSSZ. Here
+\eqref{eq:objective}. Here
 $w_{k,m}=1/(|\mathcal{M}_k|\max(E_{z,k,m},1))$ gives every control table equal
 weight; the released defaults are $\lambda_0=10^5$ and $\lambda_1=10^{-2}$.
 Coverage remains soft, so an unsourceable cell is reported rather than making
@@ -179,6 +199,20 @@ object of the zone fitter, not of the small pool-expansion program. The
 coverage constraints are soft ($e_c$) precisely so that an unsourceable
 cell, a structural zero, a padding code, or a cell with no donor anywhere, does
 not make the program infeasible; it is reported instead.
+
+\emph{Why the block does not fit the joint distribution.} The admitted set is
+chosen against the marginal control tables because those are the only
+zone-level targets available: the microdata are released at SA4 level, so a
+zone-specific joint target does not exist. Adding a pairwise association term to
+\eqref{eq:mip_joint_objective} would therefore fit the SA4 donor distribution,
+not the zone, and would confound the pool-support counterfactual with a second,
+differently identified model. Intra-household relationships are preserved by
+construction---real shell, donor profile, recomputed family counters and
+whole-household validation---and the joint distribution over attribute
+combinations is the object of the zone fitter, which selects and replicates from
+the admitted set under \eqref{eq:objective}. If a zone-level joint target became
+available, a weighted pair-deviation term could be added to
+\eqref{eq:mip_joint_objective} without changing the rest of the program.
 
 The model is deliberately \emph{not} required to reproduce the census at pool
 scale. The deficit in a zone is often tens of thousands of persons, while the

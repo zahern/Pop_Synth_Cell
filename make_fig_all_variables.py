@@ -34,6 +34,7 @@ ARM_ORDER = [
     ("ipu_only", "IPU-Only", "#D55E00"),
     ("cp_sa", "CP-pool + SA", "#E69F00"),
     ("cp_ipu", "CP-pool + IPU", "#009E73"),
+    ("cp_mip", "CP-MIP", "#34495E"),
 ]
 ARM_KEYS = [a[0] for a in ARM_ORDER]
 CENSUS_COLOUR = "#9E9E9E"

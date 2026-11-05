@@ -262,7 +262,7 @@ where \( x \) is the zone-level household selection and \( \mathcal{M}_k \) is t
 
 \end{enumerate}
 
-Constraint C7 closes the zone program. Pool support is enabled by default: the constraint block \eqref{eq:mip_joint} above is appended to the same constraint set, and the admitted pool is \(\mathcal{J}_z^{+}=\{j\in\mathcal{J}_z:y_j=1\}\). When the block is disabled, \(\mathcal{J}_z^{+}=\mathcal{H}_z\): no constructed record is admitted, so the fit cannot use the extra pool. The block introduces support variables and construction slacks but no objective term, so \eqref{eq:objective} and the fitting procedure are identical in the two runs. The only change is the candidate set available to the fit, which is what makes the RSSZ difference between the two runs attributable to pool support rather than to a different criterion.
+Constraint C7 closes the zone program. Pool support is enabled by default: the constraint block \eqref{eq:mip_joint} above is appended to the same constraint set, and the admitted pool is \(\mathcal{J}_z^{+}=\{j\in\mathcal{J}_z:y_j=1\}\). When the block is disabled, \(\mathcal{J}_z^{+}=\mathcal{H}_z\): no constructed record is admitted, so the fit cannot use the extra pool. The block is a separate admission program with its own objective, \eqref{eq:mip_joint_objective}, but it adds no term to \eqref{eq:objective}, so the fitting criterion and procedure are identical in the two runs. The only change is the candidate set available to the fit, which is what makes the RSSZ difference between the two runs attributable to pool support rather than to a different criterion.
 
 The census rules applied in the case study are described in Section~\ref{sec:casestudy} and formalised in Appendix~\ref{sec:ref}.
 
