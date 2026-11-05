@@ -187,6 +187,10 @@ CONSTRAINT_CHECKS = {
         if "CACF" in df.columns and "CPRF" in df.columns
         else _false(df),
 
+    # R10 is a conservative plausibility filter, not a census impossibility:
+    # 468 of 3,263 negative-income households in the source extract carry an
+    # active mortgage repayment. It is retained because the released pool was
+    # built with it; removing it would change the pool and every fitted arm.
     "HIND==1 (negative income) but MRERD active":
         lambda df: (df["HIND"] == 1) & (df["MRERD"] != MRERD_NOT_APPLICABLE)
         if "HIND" in df.columns and "MRERD" in df.columns

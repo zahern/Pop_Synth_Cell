@@ -350,7 +350,8 @@ def enforce_feasibility(synth, train, rng_seed=0, report_dir=None):
     # Ren/mortgage mutual exclusion (distribution-preserving tenure choice).
     log["rent_mortgage"] = _resolve_rent_mortgage(synth, train, rng)
 
-    # Negative household income cannot carry a mortgage.
+    # R10 plausibility filter, not a census impossibility: 468 of 3,263
+    # negative-income households in the source extract carry a mortgage.
     if {"HIND", "MRERD"} <= set(synth.columns):
         bad = (synth["HIND"] == HIND_NEGATIVE) & (synth["MRERD"] != MRERD_NOT_APPLICABLE)
         synth.loc[bad, "MRERD"] = MRERD_NOT_APPLICABLE

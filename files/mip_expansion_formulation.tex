@@ -52,7 +52,7 @@ in family), \texttt{CACF} (children under 15 in family),
 \texttt{persons\_in\_family}, \texttt{persons\_in\_household} and
 \texttt{families\_in\_household}. The new person's \texttt{RLHP} role is the
 shell slot, and its family and dwelling attributes are those of the block. The
-whole household is then validated against the eleven shared rules of
+whole household is then validated against the eleven consistency rules of
 Appendix~\ref{sec:ref}; a candidate that fails is discarded, not patched. This
 is what keeps the individual attributes aligned with the household variables: a
 donation cannot leave a person with a family role, a child count or a dwelling
@@ -62,7 +62,7 @@ traces the two steps.
 \input{files/donor_chromosome.tex}
 
 \emph{Constraint guarantee.} Every candidate is checked as a whole household,
-after the counters have been recomputed, against the same eleven rules used by
+after the counters have been recomputed, against the same eleven consistency rules used by
 the pool builder (Appendix~\ref{sec:ref}). The repair program also carries the
 forbidden-pair cuts $\mathcal{C}$, so a donor attribute cannot create a
 combination the rules forbid; if no feasible profile exists, the donor--shell
@@ -140,7 +140,7 @@ the fitted population: \(y_j=1\) makes candidate \(j\) available to the zone
 fitter, which then selects from that set with \(x_{i,h}\). Each admitted unit is
 a whole constructed household, not an isolated person: its \(s_j\) members enter
 together with the shell's family roles, household composition and dwelling
-fields, and the household has already passed the eleven whole-household rules.
+fields, and the household has already passed the eleven whole-household consistency rules.
 The number of added persons is therefore \(\sum_j s_j y_j\), which the budget row
 caps at \(P_z^{\mathrm{add}}\); the carrier rows count those members for
 person-level tables and the household once for household-level tables. Filling a

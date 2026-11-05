@@ -111,7 +111,7 @@
 % validation
 \node[diamond, draw=black!55, fill=blue!5, aspect=2.0, inner sep=1pt,
       font=\tiny, align=center] (val) at (12.50,0.72)
-  {11 shared\\rules};
+  {11 consistency\\checks};
 \draw[flow] (12.50,1.55) -- (val.north);
 % The outcomes are boxes, so both arrows terminate at a node.
 \node[box, draw=red!65!black, fill=red!8, text=red!65!black,
@@ -141,7 +141,7 @@ carries the donor's attributes where the rules allow and the shell's household
 context everywhere else. \textbf{(b)} The family and household counters
 (\texttt{CPRF}, \texttt{CACF}, \texttt{NPRD}, \texttt{families}) are recomputed
 from the solved member vectors, and the whole household is checked against the
-eleven shared rules of Appendix~\ref{sec:ref}. A candidate that fails is
+eleven consistency rules of Appendix~\ref{sec:ref}. A candidate that fails is
 discarded, not patched; a candidate that passes is emitted with a fresh
 identifier and the target SA2 tag. Profiles outside the person-level model fall
 back to a whole-household copy; the figure shows the person-level repair path.}
