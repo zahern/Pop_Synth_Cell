@@ -332,6 +332,7 @@ arms were fitted on different zones: every arm was fitted and scored on the fitt
 Scope            & 371 & all & Every SA2 zone in the study area. Four have no usable individual target and are excluded from fitting, so the scope is a bookkeeping total rather than a scored cohort \\
 Fitted cohort    & 367 & all arms & The \textbf{single zone set used throughout this paper}: every SA2 zone with a census population. Mean and median RSSZ on the 11 tables every arm carries \\
 Marginal panels  & 367 & all arms & Zones in which every arm has written a full marginal for the plotted tables, which the six-series figures require (Figures~\ref{fig:marginal_differences} and~\ref{fig:marginals_all_tables}) \\
+Pool-gain panel  & 60  & fixed-fitter pairs & Zones common to the raw and expanded pools in Figures~\ref{fig:pool_gain_ipu} and~\ref{fig:pool_gain_sa}; the fitter is held constant, so the panel is descriptive rather than a cohort estimate \\
 Held-out matched & 367 & all arms & Held-out control-table comparison (Table~\ref{tab:heldout}, Figure~\ref{fig:heldout_tvd}) \\
 Expansion audit  & 367 & expansion step & The zero-capacity-cell audit of every fitted zone's pool slice, with the coverage-selected households for it (Appendix~\ref{sec:pool_expansion_audit}) \\
 \bottomrule
@@ -684,8 +685,8 @@ rank there, and which tables carry the residual that the one-MIP fit removes.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{fig4_marginals_by_arm.png}\caption{Synthesised versus true census marginals for the \texttt{heap} (highest educational
-attainment) control table, on the fitted cohort on which all five arms are available.
-Each category shows six bars: the census target (grey) followed by SA-Only, IPU-Only,
+attainment) control table, on the fitted cohort on which all five arms are available and
+on the 11-table reporting basis. Each category shows six bars: the census target (grey) followed by SA-Only, IPU-Only,
 CP-pool+SA, CP-pool+IPU and CP-MIP. A level set of bars reproduces the marginal; a gap is a
 shortfall or an overshoot. The Not applicable category (code 11) and the effectively empty
 code 12 are excluded because they dominate or add nothing to the remaining categories;
@@ -720,7 +721,7 @@ cohort estimate; cohort values are in Tables~\ref{tab:pool_fitter_matrix} and
 \centering
 \includegraphics[width=\textwidth]{fig_pool_gain_ipu.png}
 \caption{What the expanded candidate pool changes for a fixed fitter, on the
-shared 60-zone marginal panel. Both arms use the
+shared 60-zone marginal panel and the 19-table fitting basis. Both arms use the
 identical IPU implementation and differ only in the pool (raw microdata against the
 constructed and expanded pool), so this is a pool contrast with the fitter held constant.
 \textbf{Left:} the \texttt{qalfp} (field of study) residual; the fall is the
@@ -740,7 +741,7 @@ hurts the IPU fit.}
 \centering
 \includegraphics[width=\textwidth]{fig_pool_gain_sa.png}
 \caption{The same pool contrast for the SA fitter, on the shared 60-zone
-marginal panel. Both arms use the identical SA implementation and differ only
+marginal panel and the 19-table fitting basis. Both arms use the identical SA implementation and differ only
 in the pool. \textbf{Left:} the \texttt{qalfp} residual; the fall is the same
 supplementary-code recode documented for the IPU pair, not a pool effect.
 \textbf{Right:} the remaining eighteen control tables. The
@@ -756,7 +757,8 @@ panel, not a cohort-level estimate.}
 \begin{table}[h!]
 \centering
 \caption{Category-level composition of the \texttt{heap} (highest educational attainment)
-marginal, in per cent of persons, on the shared 60-zone cohort. \texttt{heap} is the control
+marginal, in per cent of persons, on the shared 60-zone cohort under the 19-table
+fitting basis. \texttt{heap} is the control
 table the fit is asked to match on educational attainment, so each row is one attainment
 level and a well-fitted arm reproduces the census column. This is the table whose coding was
 repaired before this run: in the raw ABS export the two certificate rows are transposed,
