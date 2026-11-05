@@ -32,6 +32,7 @@ import glob
 import os
 import sys
 
+import numpy as np
 import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -60,6 +61,14 @@ def _cohort() -> set[str]:
     path = os.path.join(HERE, "pbs", "zones_371.txt")
     zones = {line.strip() for line in open(path) if line.strip()}
     return zones - EXCLUDED
+
+
+def _trimmed_mean(values, q: float = 0.05) -> float:
+    """Mean after dropping the lowest and highest q share of zones."""
+    x = np.sort(np.asarray(values, dtype=float))
+    x = x[~np.isnan(x)]
+    k = int(np.floor(q * len(x)))
+    return float(x[k:len(x) - k].mean()) if len(x) > 2 * k else float(x.mean())
 
 
 def _find_column(df: pd.DataFrame, table: str):
@@ -250,6 +259,12 @@ def main() -> int:
     summary.columns = ["_".join(c) for c in summary.columns]
     summary = summary.rename(columns={"rssz19_count": "count"}).reset_index()
     summary = summary.drop(columns=["rssz11_count"])
+    # Robust tail summaries beside the mean, so a two-zone incumbent cannot
+    # be hidden by, or dominate, the headline number.
+    for basis in ("rssz19", "rssz11"):
+        summary[f"{basis}_trim5"] = [
+            _trimmed_mean(zones.loc[zones.arm == arm, basis])
+            for arm in summary["arm"]]
     out_dir = os.path.join(OUT_ROOT, "paper_arms")
     os.makedirs(out_dir, exist_ok=True)
     zones.to_csv(os.path.join(out_dir, "paper_arms_zones.csv"), index=False)
@@ -275,10 +290,13 @@ def main() -> int:
                  "cp_sa": "CP-pool+SA", "cp_ipu": "CP-pool+IPU",
                  "large_sa": "Large-pool+SA", "large_ipu": "Large-pool+IPU",
                  "fixed_sa": "Large-aware+SA", "fixed_ipu": "Large-aware+IPU"}
-        print("\nLaTeX rows (rssz19)")
-        for _, row in summary.iterrows():
-            print(f"{label.get(row.arm, row.arm):<16} & {int(row['count'])} & "
-                  f"{row['rssz19_mean']:.3f} & {row['rssz19_median']:.3f} \\\\")
+        for basis in ("rssz11", "rssz19"):
+            print(f"\nLaTeX rows ({basis})")
+            for _, row in summary.iterrows():
+                print(f"{label.get(row.arm, row.arm):<16} & {int(row['count'])} & "
+                      f"{row[f'{basis}_mean']:.3f} & "
+                      f"{row[f'{basis}_trim5']:.3f} & "
+                      f"{row[f'{basis}_median']:.3f} \\\\")
     return 0
 
 

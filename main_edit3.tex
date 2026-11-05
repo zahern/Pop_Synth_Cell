@@ -549,31 +549,31 @@ Residual cells: \texttt{qalfp:16} / \texttt{vehrd:6} / \texttt{strd:6} & 353 / 1
 
 \begin{table}[h!]
 \centering
-\caption{The pool $\times$ fitter design, with the completion status of each arm. Mean and median RSSZ are reported on the \textbf{11 control tables shared by every arm}, summed per zone, over the identical \textbf{367-zone fitted cohort}; smaller is better. Every row is on that one basis, so the rows are directly comparable and no arm is credited with a number produced on a different table set.}
+\caption{The pool $\times$ fitter design, with the completion status of each arm. Mean, 5\% trimmed mean and median RSSZ are reported on the \textbf{11 control tables shared by every arm}, summed per zone, over the identical \textbf{367-zone fitted cohort}; smaller is better. The trimmed mean drops the zones below the 5th and above the 95th percentile. Every row is on that one basis, so the rows are directly comparable and no arm is credited with a number produced on a different table set.}
 \label{tab:pool_fitter_matrix}
 \footnotesize
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lllcccp{4.6cm}@{}}
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}lllcccc l@{}}
 \toprule
-\textbf{Arm} & \textbf{Pool} & \textbf{Fitter} & \textbf{Zones} & \textbf{Mean} & \textbf{Median} & \textbf{Status} \\
+\textbf{Arm} & \textbf{Pool} & \textbf{Fitter} & \textbf{Zones} & \textbf{Mean} & \textbf{Trim.} & \textbf{Median} & \textbf{Status} \\
 \midrule
-SA-Only      & raw microdata & SA  & 367 & 0.247 & 0.233 & Complete; 11 tables \\
-IPU-Only     & raw microdata & IPU & 367 & 0.435 & 0.275 & Complete; 11 tables \\
-CP-only+SA   & CP feasible pool & SA  & 367 & 0.285 & 0.163 & Complete; 11 tables \\
-CP-only+IPU  & CP feasible pool & IPU & 367 & 0.324 & 0.193 & Complete; 11 tables \\
-CP-MIP       & CP feasible pool & integer MIP & 367 & 0.253 & 0.066 & Complete; 11 tables \\
-MIP+SA       & CP + MIP pool & SA  & 367 & 0.511 & 0.295 & Complete; 11 tables \\
-MIP+IPU      & CP + MIP pool & IPU & 367 & 0.315 & 0.193 & Complete; 11 tables \\
-MIP+SA (comp.) & CP + composition filter & SA & 367 & 0.250 & 0.158 & Complete; 11 tables \\
-MIP+IPU (comp.) & CP + composition filter & IPU & 367 & 0.302 & 0.196 & Complete; 11 tables \\
+SA-Only      & raw microdata & SA  & 367 & 0.247 & 0.239 & 0.233 & Complete \\
+IPU-Only     & raw microdata & IPU & 367 & 0.435 & 0.326 & 0.275 & Complete \\
+CP-only+SA   & CP feasible pool & SA  & 367 & 0.285 & 0.201 & 0.163 & Complete \\
+CP-only+IPU  & CP feasible pool & IPU & 367 & 0.324 & 0.217 & 0.193 & Complete \\
+CP-MIP       & CP feasible pool & integer MIP & 367 & 0.253 & 0.077 & 0.066 & Complete \\
+MIP+SA       & CP + MIP pool & SA  & 367 & 0.511 & 0.406 & 0.295 & Complete \\
+MIP+IPU      & CP + MIP pool & IPU & 367 & 0.315 & 0.217 & 0.193 & Complete \\
+MIP+SA (comp.) & CP + composition filter & SA & 367 & 0.250 & 0.187 & 0.158 & Complete \\
+MIP+IPU (comp.) & CP + composition filter & IPU & 367 & 0.302 & 0.211 & 0.196 & Complete \\
 \bottomrule
 \end{tabular}
 \end{table}
-{\footnotesize\textit{Note:} all scored rows are computed from the released summaries on the same 367 zones and the same 11 shared tables, summed per zone, so the columns are comparable across rows. CP-only and MIP arms are now complete refits; the composition-filtered arms are MIP variants. The paired CP-only/MIP difference isolates the effect of expansion, while the composition-filtered rows isolate the effect of the append filter. CP-MIP fits integer replication counts over the whole candidate slice; its mean is inflated by two zones that returned a 120-second incumbent, identified in Table~\ref{tab:pathological_zones}. Table~\ref{tab:full_audit} reports the diversity cost of that fit.}
+{\footnotesize\textit{Note:} all scored rows are complete 367-zone refits computed from the released summaries on the same 11 shared tables, summed per zone, so the columns are comparable across rows. The composition-filtered arms are MIP variants. The paired CP-only/MIP difference isolates the effect of expansion, while the composition-filtered rows isolate the effect of the append filter. CP-MIP fits integer replication counts over the whole candidate slice; its mean is inflated by two zones that returned a 120-second incumbent, SA2s 302031036 and 316071546, which is why the trimmed mean is reported beside it. Table~\ref{tab:full_audit} reports the diversity cost of that fit.}
 
 \textbf{The pool effect under a fixed fitter.} Table~\ref{tab:pool_fitter_matrix} separates the pool effect from the fitter effect. With the fitter held at IPU, the constructed pool lowers both the mean and the median relative to IPU-Only. With the fitter held at SA, the constructed pool is close to SA-Only, while the full-menu MIP append is worse; when the appended menu is composition-filtered, the SA arm matches SA-Only and improves its median. The clean pool contrast is therefore CP-only+IPU against IPU-Only, which share one zone set and differ only by the constructed pool. The constructed pool also differs from the raw microdata in size and composition as well as feasibility, so that pair identifies the pool as a whole rather than the feasibility property alone.
 
-\textbf{The one-MIP arm.} CP-MIP replaces the selection/weighting fitter with one integer program per zone. It chooses an integer replication count for every candidate household in the zone's SA4 slice, minimising missed control cells first and table deviations second, with a pool-anchored soft block for joint and uncontrolled attributes. Table~\ref{tab:pool_fitter_matrix} shows that it has the lowest median RSSZ of any arm, although its mean is not the lowest: two zones return a 120-second incumbent and carry most of its tail. Table~\ref{tab:full_audit} shows the cost, with the highest within-zone duplication and joint TVD, so the marginal median is bought by replication rather than a richer joint structure. A 19-zone sweep shows that the in-sample optimum is not the held-out optimum; the released sweep summary reports the grid, and the reported arm uses a middle setting. The same sweep
+\textbf{The one-MIP arm.} CP-MIP replaces the selection/weighting fitter with one integer program per zone. It chooses an integer replication count for every candidate household in the zone's SA4 slice, minimising missed control cells first and table deviations second, with a pool-anchored soft block for joint and uncontrolled attributes. Table~\ref{tab:pool_fitter_matrix} shows that it has the lowest median RSSZ of any arm, although its mean is not the lowest: two zones, 302031036 and 316071546, return a 120-second incumbent and carry most of its tail. Table~\ref{tab:full_audit} shows the cost, with the highest within-zone duplication and joint TVD, so the marginal median is bought by replication rather than a richer joint structure. A 19-zone sweep shows that the in-sample optimum is not the held-out optimum; the released sweep summary reports the grid, and the reported arm uses a middle setting. The same sweep
 identifies the duplication lever: the within-zone identical-person share falls
 monotonically as the replication cap is lowered, while the joint-weight setting
 barely changes it, so the held-out-winning setting is also the least duplicating
@@ -590,8 +590,8 @@ with missed cells counted and penalised ahead of deviation. The division is
 deliberate: putting 367 different zone targets into a pool built once would make
 the pool zone-specific and duplicate the fitter. Where the pool cannot source a
 cell, the miss count in the released CP-MIP summary records it, and those misses
-concentrate in the same pool-gap zones as the SA tail in
-Table~\ref{tab:pathological_zones}.
+concentrate in the two pool-gap zones that dominate its own tail, 302031036 and
+316071546.
 
 Table~\ref{tab:pathological_zones} isolates the zones where the constructed-pool fitters fail. In 302031036 the pool lacks the dwelling records needed for \texttt{rntrd}, \texttt{mrerd} and \texttt{vehrd}; in 112011237 the failure is the household-size trade-off discussed above. The zones are pool gaps, not evidence about the fitter, and remain in the cohort means.
 
