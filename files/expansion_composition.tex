@@ -8,7 +8,9 @@ the admission vector, are not in the deviation terms and are not subject to the
 composition tie-break. The result is a pool that is cell-complete but
 compositionally skewed, with a surplus of size-7 households and \texttt{mtwp}
 code 17. Table~\ref{tab:expansion_composition} reports the base pool, that
-build and the controlled variants.
+build and the controlled variants. It is read in three blocks: the released
+build, the 300-donor controlled variants that isolate the append filter, and the
+2{,}000-donor negative result.
 
 Two composition-controlled variants were built from the same shards, without
 rerunning the MIP. The \emph{coverage-only} variant keeps the selected support
@@ -22,9 +24,11 @@ fitted RSSZ.
 
 \begin{table}[h!]
 \centering
-\caption{Composition and fit of the expansion variants. Size-7 is the share
-of households in the \texttt{nprd} code-7 cell; \texttt{mtwp} 17 is the share
-of persons in the ``Not stated'' travel category. The fitted columns are
+\caption{Composition control in the MIP-appended menu. The first block is the
+released build; the second holds the donor menu fixed at 300 donors and varies
+what is appended; the third is the larger-menu negative result. Size-7 is the
+share of households in the \texttt{nprd} code-7 cell; \texttt{mtwp} 17 is the
+share of persons in the ``Not stated'' travel category. The fitted columns are
 11-table RSSZ on the 367-zone fitted cohort. The first row is the unexpanded
 pool, so the second row isolates the expansion step.}
 \label{tab:expansion_composition}
@@ -35,11 +39,16 @@ pool, so the second row isolates the expansion step.}
 \toprule
 Variant & Persons & Households & Size-7 & \texttt{mtwp} 17 & SA mean & SA med. & IPU mean & IPU med. \\
 \midrule
+\multicolumn{9}{@{}l}{\emph{Released build}} \\
 Base CP pool (no expansion) & 1{,}396{,}342 & 549{,}699 & 5.0\% & 0.0\% & 0.285 & 0.163 & 0.324 & 0.193 \\
 Current MIP-expanded pool & 1{,}463{,}817 & 569{,}024 & 5.6\% & 1.5\% & 0.511 & 0.295 & 0.315 & 0.193 \\
+\midrule
+\multicolumn{9}{@{}l}{\emph{300-donor controlled variants}} \\
 300-donor full-menu MIP & 1{,}879{,}051 & 732{,}537 & 8.7\% & 6.9\% & 1.822 & 1.168 & 1.127 & 0.789 \\
 300-donor, coverage-only & 1{,}410{,}278 & 554{,}423 & 5.1\% & 0.5\% & 0.329 & 0.177 & 0.335 & 0.214 \\
 300-donor, composition-aware & 1{,}609{,}883 & 624{,}912 & 4.5\% & 0.5\% & 0.250 & 0.158 & 0.302 & 0.196 \\
+\midrule
+\multicolumn{9}{@{}l}{\emph{2{,}000-donor negative result (composition only)}} \\
 2{,}000-donor, full menu & 3{,}576{,}519 & 1{,}207{,}317 & 21.8\% & 32.0\% & n/a & n/a & n/a & n/a \\
 2{,}000-donor, composition filter & 1{,}650{,}669 & 642{,}587 & 0.0\% & 0.0\% & n/a & n/a & n/a & n/a \\
 \bottomrule
