@@ -630,11 +630,12 @@ one tested. No cap removes duplication entirely; replication is what buys the
 marginal fit, and penalising duplicate tuples directly in the objective remains
 future work.
 
-The construction and expansion stages do not fit zone totals: the pool is built
-once over the whole census, and the expansion step only restores cells that a
-zone's slice cannot supply. Zone marginals enter at fitting, and in the one-MIP
-arm they enter as explicit constraints over every candidate household, with
-missed cells counted and penalised ahead of deviation. The division is
+The construction and expansion stages do not reproduce zone totals: the pool is
+built once over the whole census, and the expansion step only restores cells
+that a zone's slice cannot supply, using the zone's marginal shares only to
+choose among coverage-equivalent sets. Zone totals enter at fitting, and in the
+one-MIP arm they enter as explicit constraints over every candidate household,
+with missed cells counted and penalised ahead of deviation. The division is
 deliberate: putting 367 different zone targets into a pool built once would make
 the pool zone-specific and duplicate the fitter. Where the pool cannot source a
 cell, the miss count in the released CP-MIP summary records it, and those misses
