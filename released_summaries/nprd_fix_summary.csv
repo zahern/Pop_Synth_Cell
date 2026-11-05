@@ -1,0 +1,5 @@
+pool,households,nprd0,nprd7,nprd8
+feasible_pool.csv,549699,0,27193,0
+feasible_pool_nprdfix.csv,549699,27193,662,199
+feasible_pool_expanded_hhts_loc.csv,569024,0,31689,0
+feasible_pool_expanded_hhts_loc_nprdfix.csv,569024,31689,1476,456

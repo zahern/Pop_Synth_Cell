@@ -133,6 +133,8 @@ column order. `full_cohort_audit.py` reads the released populations.
 
 ## Notes and known limitations
 
+- **NPRD coding.** The fused microdata use `NPRD=7` as a residual/not-applicable code for `HHCD` 5-7, while the control tables use 7 as a seven-person size category. `fix_nprd_coding.py` recomputes `NPRD` from household membership, keeps `NPRD_ORIG`, and sets `NPRD_NA` for the non-private/not-applicable dwellings. The released pool is the uncorrected build; the corrected pool is the proposed fix and is being validated.
+
 - **Control-table basis.** Two bases are used. The fitting objective uses all 19
   in-sample control tables; the primary arm comparison (`tab:expansion_composition`,
   `tab:pool_fitter_matrix`) uses the 11 tables shared by every arm. Pool-support
