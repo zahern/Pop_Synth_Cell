@@ -1,10 +1,10 @@
 \begin{table}[h!]
 \centering
 \caption{Held-out RSSZ by table for the completed arms on the 367-zone fitted
-cohort. Entries are mean per-zone RSSZ on each held-out table; lower is better.
-Each cell uses the zones where that table is defined for both the arm and the
-census. The seven tables were excluded from the fitting basis. \texttt{lfsp} is
-scored on 258 zones for RSSZ; \texttt{hcfmf} needs
+cohort. Entries are mean per-zone RSSZ with the median in parentheses; lower is
+better. Each cell uses the zones where that table is defined for both the arm
+and the census. The seven tables were excluded from the fitting basis.
+\texttt{lfsp} is scored on 258 zones for RSSZ; \texttt{hcfmf} needs
 \texttt{families\_in\_household}, which the two raw arms do not carry.}
 \label{tab:heldout_rssz}
 \footnotesize
@@ -14,24 +14,27 @@ scored on 258 zones for RSSZ; \texttt{hcfmf} needs
 \toprule
 Held-out table & SA-Only & IPU-Only & CP-SA & CP-IPU & Comp-SA & Comp-IPU & CP-MIP \\
 \midrule
-age5p (age by 5-year group) & 0.012 & 0.016 & 0.008 & 0.009 & 0.007 & 0.010 & 0.007 \\
-assnp (need for assistance) & 0.186 & 0.257 & 0.194 & 0.221 & 0.262 & 0.273 & 0.050 \\
-bedrd (bedrooms)            & 0.174 & 0.042 & 0.057 & 0.037 & 0.059 & 0.037 & 0.032 \\
-hcfmf (family composition)  & n/a   & n/a   & 0.045 & 0.067 & 0.698 & 0.579 & 0.062 \\
-hhcd (household composition)& 0.095 & 0.023 & 0.018 & 0.018 & 0.019 & 0.022 & 0.020 \\
-lfsp (labour force status)  & 0.177 & 0.263 & 0.247 & 0.256 & 0.271 & 0.280 & 0.079 \\
-tenlld (landlord type)      & 1.097 & 0.198 & 0.203 & 0.222 & 0.125 & 0.100 & 0.959 \\
+age5p (age by 5-year group) & 0.012 (0.002) & 0.016 (0.003) & 0.008 (0.002) & 0.009 (0.003) & 0.007 (0.002) & 0.010 (0.004) & 0.007 (0.002) \\
+assnp (need for assistance) & 0.186 (0.002) & 0.257 (0.002) & 0.194 (0.001) & 0.221 (0.001) & 0.262 (0.013) & 0.273 (0.011) & 0.050 (0.001) \\
+bedrd (bedrooms)            & 0.174 (0.023) & 0.042 (0.018) & 0.057 (0.021) & 0.037 (0.017) & 0.059 (0.021) & 0.037 (0.018) & 0.032 (0.015) \\
+hcfmf (family composition)  & n/a & n/a & 0.045 (0.043) & 0.067 (0.064) & 0.698 (0.386) & 0.579 (0.311) & 0.062 (0.057) \\
+hhcd (household composition)& 0.095 (0.012) & 0.023 (0.014) & 0.018 (0.011) & 0.018 (0.013) & 0.019 (0.012) & 0.022 (0.017) & 0.020 (0.011) \\
+lfsp (labour force status)  & 0.177 (0.037) & 0.263 (0.042) & 0.247 (0.038) & 0.256 (0.041) & 0.271 (0.042) & 0.280 (0.044) & 0.079 (0.038) \\
+tenlld (landlord type)      & 1.097 (0.021) & 0.198 (0.015) & 0.203 (0.018) & 0.222 (0.013) & 0.125 (0.012) & 0.100 (0.011) & 0.959 (0.012) \\
 \bottomrule
 \end{tabular}%
 }
-\end{table}
 
+\par\smallskip
 {\footnotesize\textit{Note:} the RSSZ and TVD held-out tables differ by one
 \texttt{lfsp} zone (258 here, 259 in Table~\ref{tab:heldout}) because RSSZ
-requires a positive expected count in every cell. CP-MIP's \texttt{tenlld}
-mean is dominated by a single zone, 302031036, the known pool-capacity gap in
-Table~\ref{tab:pathological_zones}. Excluding it, the arm's mean across the
-seven tables falls sharply and its \texttt{tenlld} error is in line with the
-best arms. The arm's median across tables is lower than its mean for the same
-reason.
+requires a positive expected count in every cell. Several means are
+heavy-tailed. Zone 302031036 is a non-private-dwelling SA2 whose household
+controls carry at most 35 households, while every arm emits several hundred
+households there; it alone accounts for most of the SA-Only means on
+\texttt{assnp}, \texttt{hhcd}, \texttt{lfsp}, \texttt{tenlld} and
+\texttt{age5p}, and for a large part of the \texttt{tenlld} mean of every arm.
+The median in parentheses is the robust comparison; the mean is retained for
+comparability with the main tables.
 }
+\end{table}

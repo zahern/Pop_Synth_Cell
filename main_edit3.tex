@@ -614,10 +614,10 @@ pool-to-pool conclusions above are not an artefact of zone mix.
 \caption{Scaling with zone size on the fitted cohort, grouped into
 census-population quintiles from smallest (Q1) to largest (Q5).
 \textbf{(a)} Median 11-table RSSZ per quintile for SA-Only, IPU-Only,
-CP-only + SA, the composition-filtered pool + SA, and CP-MIP.
-\textbf{(b)} The share of zones in each quintile that beat SA-Only.
-The rank order is stable across the size range; the per-zone values behind the
-figure are released with the code.}
+CP-only + SA, the composition-filtered pool + SA (Comp. pool + SA), and CP-MIP.
+\textbf{(b)} The share of zones in each quintile that beat SA-Only; SA-Only is
+the baseline and is therefore not drawn. The rank order is stable across the
+size range; the per-zone values behind the figure are released with the code.}
 \label{fig:zone_size}
 \end{figure}
 
@@ -655,17 +655,16 @@ control tables are summarised in Figure~\ref{fig:marginals_all_tables}.}
 \centering
 \includegraphics[width=\textwidth]{fig_fit_example.png}
 \caption{Worked example on one mid-cohort SA2 zone (301011004), chosen as a
-typical zone rather than the tail. \textbf{(a)} The 11-table RSSZ of every arm
-on this zone, in pipeline order: the first two fit raw microdata directly, the
-CP-pool arms fit the constructed pool, and CP-MIP replaces the fitter with one
-integer program. \textbf{(b)} The same zone's per-table residuals under
-CP-pool + SA and CP-MIP on the 19-table fitting objective, sorted by the SA
-arm's value. The one-MIP fit concentrates its gains on the tables where the
-annealer's residual sits, at the cost of small residual increases on tables the
-SA arm had already zeroed; that trade-off is what the integer program's
-hierarchical objective buys. The zone is illustrative of the mechanism, not a
-cohort estimate; cohort values are in Tables~\ref{tab:pool_fitter_matrix} and
-\ref{tab:full_audit}.}
+typical zone rather than the tail. \textbf{(a)} The 11-table RSSZ of the seven
+core arms on this zone, grouped by pool: the first two fit raw microdata, the
+next three fit the CP feasible pool, and the last two fit the MIP-expanded
+pool. \textbf{(b)} The same zone's per-table residuals under CP-only + SA and
+CP-MIP on the 19-table fitting objective, sorted by the SA arm's value. On this
+zone the one-MIP fit lowers the residual on every table rather than trading one
+table against another; its cost is the within-zone duplication reported in
+Table~\ref{tab:full_audit}, not a marginal regression. The zone is illustrative
+of the mechanism, not a cohort estimate; cohort values are in
+Tables~\ref{tab:pool_fitter_matrix} and~\ref{tab:full_audit}.}
 \label{fig:fit_example}
 \end{figure}
 
@@ -1039,15 +1038,17 @@ attribute once per member and inflated the affected distances.}
 
 \input{files/heldout_rssz.tex}
 
-The one-MIP arm changes the held-out picture. Table~\ref{tab:heldout_rssz}
-reports its per-table RSSZ: it has the lowest median across tables, and
-excluding the single pool-gap zone 302031036 its mean falls sharply. It
-improves the person-level held-out tables substantially, while household
-composition and family composition are slightly worse. The \texttt{tenlld}
-column is dominated by the same zone; excluding it, the arm's \texttt{tenlld}
-mean is in line with the best arms. The one-MIP therefore improves person-level
-structure at a small cost on two household tables, and inherits the same
-pool-capacity tail as the in-sample fit.
+The one-MIP arm changes the held-out picture, but not uniformly.
+Table~\ref{tab:heldout_rssz} reports mean RSSZ with the median in parentheses.
+It has the lowest mean on \texttt{assnp}, \texttt{bedrd} and \texttt{lfsp},
+while \texttt{hcfmf} and \texttt{hhcd} are slightly worse than CP-only+SA. Its
+\texttt{tenlld} mean is dominated by zone 302031036; the median is in line with
+the best arms. The same zone dominates the SA-Only means on \texttt{assnp},
+\texttt{hhcd}, \texttt{lfsp}, \texttt{tenlld} and \texttt{age5p}, so the
+medians, not the means, are the robust comparison. The one-MIP arm therefore
+improves the person-level and bedroom held-out tables at a small cost on two
+household tables, and inherits the same pool-capacity tail as the in-sample
+fit.
 
 \begin{figure}[t]
 \centering

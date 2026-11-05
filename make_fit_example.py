@@ -2,7 +2,7 @@
 
 Zone 301011004. Panel A: 11-table RSSZ by arm for the same zone, showing what
 each stage contributes. Panel B: the same zone's per-table residuals under
-CP-pool + SA and CP-MIP, showing where the one-MIP fit removes the residual.
+CP-only + SA and CP-MIP, showing where the one-MIP fit removes the residual.
 
 No titles: the figure is described in the caption.
 """
@@ -23,12 +23,14 @@ ZONE = "301011004"
 ARMS = pd.read_csv(os.path.join(HERE, "outputs", "paper_arms",
                                 "paper_arms_zones.csv"))
 ARMS["zone"] = ARMS["zone"].astype(str)
-LADDER = [  # (arm key, label, colour) in pipeline order
+LADDER = [  # (arm key, label, colour), grouped by pool
     ("ipu_only", "IPU-Only", "#D55E00"),
     ("sa_only", "SA-Only", "#0072B2"),
-    ("cp_ipu", "CP-pool + IPU", "#009E73"),
-    ("cp_sa", "CP-pool + SA", "#E69F00"),
+    ("base_ipu", "CP-only + IPU", "#009E73"),
+    ("base_sa", "CP-only + SA", "#E69F00"),
     ("cp_mip", "CP-MIP", "#34495E"),
+    ("cp_ipu", "MIP + IPU", "#CC79A7"),
+    ("cp_sa", "MIP + SA", "#8E44AD"),
 ]
 
 
@@ -53,13 +55,14 @@ def main():
     # Panel A: per-arm RSSZ for this zone.
     zone_scores = ARMS[ARMS.zone == ZONE].set_index("arm")["rssz11"]
 
-    # Panel B: per-table residuals, CP-pool + SA and CP-MIP.
+    # Panel B: per-table residuals, CP-only + SA and CP-MIP. Both fit the
+    # same CP feasible pool, so the contrast isolates the fitter.
     sa_tables, sa_total = load_tables(os.path.join(
-        HERE, "outputs", "cp_pool_results", "expanded_v3_chunk_*",
+        HERE, "outputs", "cp_pool_results_base", "expanded_v3_chunk_*",
         "cp_pool_rssz_summary_chunk*.csv"))
     mip_tables, mip_total = load_tables(os.path.join(
         HERE, "outputs", "cp_mip_results", "cp_pool_rssz_summary_chunk*.csv"))
-    print(f"cp_sa 19-table {sa_total:.4f} / cp_mip 19-table {mip_total:.4f}")
+    print(f"cp_only_sa 19-table {sa_total:.4f} / cp_mip 19-table {mip_total:.4f}")
 
     fig, (axA, axB) = plt.subplots(
         1, 2, figsize=(11, 4.4), gridspec_kw={"width_ratios": [1, 1.6]})
@@ -82,7 +85,7 @@ def main():
     sa_vals = [sa_tables[t] for t in order]
     mip_vals = [mip_tables.get(t, 0.0) for t in order]
     axB.bar(x - 0.2, sa_vals, width=0.4, color="#E69F00", edgecolor="black",
-            linewidth=0.3, label="CP-pool + SA")
+            linewidth=0.3, label="CP-only + SA")
     axB.bar(x + 0.2, mip_vals, width=0.4, color="#34495E", edgecolor="black",
             linewidth=0.3, label="CP-MIP")
     axB.set_xticks(x)
