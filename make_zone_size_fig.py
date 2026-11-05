@@ -1,4 +1,9 @@
-"""Zone-size scaling: median RSSZ and win rate by census-population quintile."""
+"""Tail share by zone-size quintile.
+
+The median is not the point of this figure: it is the share of zones whose
+11-table RSSZ exceeds 1.0.  That is where the MIP+SA blow-ups live, and it rises
+with zone size even though the median is flat.
+"""
 import os
 
 import matplotlib
@@ -15,61 +20,46 @@ ARMS = [
     ("sa_only", "SA-Only", "#0072B2", "o", "-"),
     ("ipu_only", "IPU-Only", "#D55E00", "s", "--"),
     ("base_sa", "CP-only + SA", "#E69F00", "^", "-."),
-    ("composition_sa", "Comp. pool + SA", "#8E44AD", "D", ":"),
+    ("composition_sa", "Comp. pool + SA", "#5E3C99", "D", ":"),
     ("cp_mip", "CP-MIP", "#34495E", "*", "-"),
+    ("cp_sa", "MIP + SA", "#8E44AD", "v", "-"),
+    ("cp_ipu", "MIP + IPU", "#CC79A7", "P", "--"),
 ]
 BINS = ["Q1", "Q2", "Q3", "Q4", "Q5"]
+TAIL = 1.0
 
 
 def main():
     d = pd.read_csv(CSV)
     d["size_bin"] = pd.Categorical(d["size_bin"], categories=BINS, ordered=True)
-    med = d.groupby("size_bin", observed=True)[[a for a, _, _, _, _ in ARMS]].median()
-    wins = {}
-    for a, _, _, _, _ in ARMS:
-        if a == "sa_only":
-            continue
-        wins[a] = (d[a] < d["sa_only"]).groupby(
-            d["size_bin"], observed=True).mean()
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.5, 4.0),
-                                   gridspec_kw={"width_ratios": [1.15, 1]})
     x = np.arange(len(BINS))
+
+    fig, ax = plt.subplots(figsize=(7.8, 4.2))
     handles = []
-    for a, label, colour, marker, linestyle in ARMS:
-        line, = ax1.plot(x, med[a].reindex(BINS).to_numpy(), marker=marker,
-                         markersize=5.5, linewidth=1.8, linestyle=linestyle,
-                         color=colour, label=label)
+    for key, label, colour, marker, linestyle in ARMS:
+        share = (d[key] > TAIL).groupby(
+            d["size_bin"], observed=True).mean().reindex(BINS) * 100
+        line, = ax.plot(x, share.to_numpy(), marker=marker, markersize=5.5,
+                        linewidth=1.8, linestyle=linestyle, color=colour,
+                        label=label)
         handles.append(line)
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(BINS)
-    ax1.set_xlabel("census-population quintile (smallest to largest)")
-    ax1.set_ylabel("median 11-table RSSZ")
+    ax.set_xticks(x)
+    ax.set_xticklabels(BINS)
+    ax.set_xlabel("census-population quintile (smallest to largest)")
+    ax.set_ylabel(f"zones with 11-table RSSZ > {TAIL:g} (%)")
+    ax.set_ylim(bottom=0)
     for sp in ("top", "right"):
-        ax1.spines[sp].set_visible(False)
+        ax.spines[sp].set_visible(False)
 
-    for a, label, colour, marker, linestyle in ARMS:
-        if a == "sa_only":
-            continue
-        ax2.plot(x, wins[a].reindex(BINS).to_numpy() * 100, marker=marker,
-                 markersize=5.5, linewidth=1.8, linestyle=linestyle,
-                 color=colour, label=label)
-    ax2.axhline(50, linestyle=":", color="#7f8c8d", linewidth=1)
-    ax2.set_ylim(0, 105)
-    ax2.set_xticks(x)
-    ax2.set_xticklabels(BINS)
-    ax2.set_xlabel("census-population quintile")
-    ax2.set_ylabel("zones beating SA-Only (%)")
-    for sp in ("top", "right"):
-        ax2.spines[sp].set_visible(False)
-
-    fig.legend(handles=handles, loc="lower center", ncol=5, frameon=False,
-               fontsize=8, bbox_to_anchor=(0.5, -0.01))
-    fig.tight_layout(rect=(0, 0.08, 1, 1))
+    fig.legend(handles=handles, loc="lower center", ncol=4, frameon=False,
+               fontsize=8, bbox_to_anchor=(0.5, -0.02))
+    fig.tight_layout(rect=(0, 0.10, 1, 1))
     fig.savefig(OUT, dpi=220, bbox_inches="tight")
     print("wrote", OUT)
-    print(med.round(3).to_string())
-    print({k: v.round(3).to_dict() for k, v in wins.items()})
+    for key, label, _, _, _ in ARMS:
+        share = (d[key] > TAIL).groupby(
+            d["size_bin"], observed=True).mean().reindex(BINS) * 100
+        print(f"{label:18s}", share.round(1).to_dict())
 
 
 if __name__ == "__main__":

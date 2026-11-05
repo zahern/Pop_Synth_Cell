@@ -549,13 +549,13 @@ Residual cells: \texttt{qalfp:16} / \texttt{vehrd:6} / \texttt{strd:6} & 353 / 1
 
 \begin{table}[h!]
 \centering
-\caption{The pool $\times$ fitter design, with the completion status of each arm. Mean, 5\% trimmed mean and median RSSZ are reported on the \textbf{11 control tables shared by every arm}, summed per zone, over the identical \textbf{367-zone fitted cohort}; smaller is better. The trimmed mean drops the zones below the 5th and above the 95th percentile. Every row is on that one basis, so the rows are directly comparable and no arm is credited with a number produced on a different table set.}
+\caption{The pool $\times$ fitter design, with the completion status of each arm. Mean, 5\% trimmed mean and median RSSZ are reported on the \textbf{11 control tables shared by every arm}, summed per zone, over the identical \textbf{367-zone fitted cohort}; smaller is better. The trimmed mean drops the 18 lowest and 18 highest zone values (5\% of 367) and averages the remaining 331. Every row is on that one basis, so the rows are directly comparable and no arm is credited with a number produced on a different table set.}
 \label{tab:pool_fitter_matrix}
 \footnotesize
 \setlength{\tabcolsep}{3.5pt}
 \begin{tabular}{@{}lllcccc l@{}}
 \toprule
-\textbf{Arm} & \textbf{Pool} & \textbf{Fitter} & \textbf{Zones} & \textbf{Mean} & \textbf{Trim.} & \textbf{Median} & \textbf{Status} \\
+\textbf{Arm} & \textbf{Pool} & \textbf{Fitter} & \textbf{Zones} & \textbf{Mean} & \textbf{Trim. mean} & \textbf{Median} & \textbf{Status} \\
 \midrule
 SA-Only      & raw microdata & SA  & 367 & 0.247 & 0.239 & 0.233 & Complete \\
 IPU-Only     & raw microdata & IPU & 367 & 0.435 & 0.326 & 0.275 & Complete \\
@@ -574,30 +574,42 @@ MIP+IPU (comp.) & CP + composition filter & IPU & 367 & 0.302 & 0.211 & 0.196 & 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{fig_rssz_by_arm.png}
-\caption{Cohort RSSZ by strategy on the 367-zone fitted cohort, 11-table
-reporting basis. \textbf{Left:} mean $\pm$ one standard deviation, clipped at
-the axis floor. \textbf{Right:} per-zone distribution (box = interquartile
-range, line = median, whiskers = 1.5 IQR, points = outliers). The mean and SD
-are dominated by the same tail zones, which is why Table~\ref{tab:pool_fitter_matrix}
-reports the trimmed mean and median beside them; the box panel shows the
-typical zone. CP-MIP has the lowest median but the largest SD; MIP+SA shifts
-the whole distribution upward, not just its tail.}
+\caption{Per-zone distribution of 11-table RSSZ by strategy on the 367-zone
+fitted cohort. Box = interquartile range, line = median, diamond = mean,
+whiskers = 1.5 IQR, points = outliers; mean $\pm$ SD is printed beside each
+arm. The mean and SD are dominated by the same tail zones, which is why
+Table~\ref{tab:pool_fitter_matrix} reports the trimmed mean and median beside
+them; the distribution shows the typical zone. CP-MIP has the lowest median but
+the largest SD; MIP+SA shifts the whole distribution upward, not just its tail.}
 \label{fig:rssz_by_arm}
 \end{figure}
 
 \textbf{Why the MIP append hurts SA.} The MIP+SA degradation is concentrated
 almost entirely in the travel-to-work and household-size tables; the other nine
 shared tables are unchanged or slightly better. The appended menu is enriched
-in size-7 households and \texttt{mtwp}-17 persons, which the annealer selects to
-cover other cells and then cannot offset. IPU is unaffected because it
-reweights the same candidates rather than selecting them, and the composition
-filter removes those households and restores SA. The append is therefore not a
-better pool for every fitter: it is a pool whose composition has to be
-controlled before a discrete selector can use it.
+in \texttt{nprd} code-7 (residual/not-applicable) households and
+\texttt{mtwp}-17 persons, which the annealer selects to cover other cells and
+then cannot offset. IPU is unaffected because it reweights the same candidates
+rather than selecting them, and the composition filter removes those households
+and restores SA. The append is therefore not a better pool for every fitter: it
+is a pool whose composition has to be controlled before a discrete selector can
+use it.
+
+The household-size component is a coding collision, not a size effect. In the
+pool, \texttt{nprd} code 7 is the residual/not-applicable code for visitors-only
+and non-classifiable dwellings: 27{,}193 of 549{,}699 pool households carry it,
+but only four have seven members; 10{,}434 have one and 9{,}030 have two. The
+control tables use code 7 as a seven-person size category. A fitter therefore
+treats residual households as size-7 carriers. In 316071546, the one-MIP arm
+selects 902 code-7 households, mostly one or two persons, against a control
+target of two size-7 households; its \texttt{nprd} RSSZ is 20.4. The same
+collision drives the \texttt{nprd} component of the MIP+SA tail. Recoding code 7
+in the pool to a separate not-applicable flag, and excluding it from the size
+control, is the correct fix; it is not done in the released run.
 
 \textbf{The pool effect under a fixed fitter.} Table~\ref{tab:pool_fitter_matrix} separates the pool effect from the fitter effect. With the fitter held at IPU, the constructed pool lowers both the mean and the median relative to IPU-Only. With the fitter held at SA, the constructed pool is close to SA-Only, while the full-menu MIP append is worse; when the appended menu is composition-filtered, the SA arm matches SA-Only and improves its median. The clean pool contrast is therefore CP-only+IPU against IPU-Only, which share one zone set and differ only by the constructed pool. The constructed pool also differs from the raw microdata in size and composition as well as feasibility, so that pair identifies the pool as a whole rather than the feasibility property alone.
 
-\textbf{The one-MIP arm.} CP-MIP replaces the selection/weighting fitter with one integer program per zone. It chooses an integer replication count for every candidate household in the zone's SA4 slice, minimising missed control cells first and table deviations second, with a pool-anchored soft block for joint and uncontrolled attributes. Table~\ref{tab:pool_fitter_matrix} shows that it has the lowest median RSSZ of any arm, although its mean is not the lowest: two zones, 302031036 and 316071546, return a 120-second incumbent and carry most of its tail; 302031036 is also the zone whose control tables disagree on the person universe, so its value reflects an unsatisfiable target rather than a fitter failure. Table~\ref{tab:full_audit} shows the cost, with the highest within-zone duplication and joint TVD, so the marginal median is bought by replication rather than a richer joint structure. A 19-zone sweep shows that the in-sample optimum is not the held-out optimum; the released sweep summary reports the grid, and the reported arm uses a middle setting. The same sweep
+\textbf{The one-MIP arm.} CP-MIP replaces the selection/weighting fitter with one integer program per zone. It chooses an integer replication count for every candidate household in the zone's SA4 slice, minimising missed control cells first and table deviations second, with a pool-anchored soft block for joint and uncontrolled attributes. Table~\ref{tab:pool_fitter_matrix} shows that it has the lowest median RSSZ of any arm, although its mean is not the lowest: two zones, 302031036 and 316071546, return a 120-second incumbent and carry most of its tail; 302031036 is also the zone whose control tables disagree on the person universe, so its value reflects an unsatisfiable target rather than a fitter failure, while 316071546 is the \texttt{nprd} coding collision above, where the incumbent covers 224 cells but overproduces code-7 households. Table~\ref{tab:full_audit} shows the cost, with the highest within-zone duplication and joint TVD, so the marginal median is bought by replication rather than a richer joint structure. A 19-zone sweep shows that the in-sample optimum is not the held-out optimum; the released sweep summary reports the grid, and the reported arm uses a middle setting. The same sweep
 identifies the duplication lever: the within-zone identical-person share falls
 monotonically as the replication cap is lowered, while the joint-weight setting
 barely changes it, so the held-out-winning setting is also the least duplicating
@@ -625,23 +637,25 @@ Table~\ref{tab:cp_sa_tail} separates search budget from pool composition on the 
 
 \input{files/cp_sa_tail.tex}
 
-\textbf{Scaling with zone size.} Figure~\ref{fig:zone_size} splits the fitted cohort
-into census-population quintiles. The rank order of the arms barely moves across
-the size range: SA-Only's median is nearly flat in size, CP-MIP's advantage over
-it holds in every quintile, and the CP-only + SA arms narrow their advantage in
-the two largest quintiles. Win rates against SA-Only track the same pattern, so
-the pool-to-pool conclusions above are not an artefact of zone mix.
+\textbf{Where the MIP tail lives.} Figure~\ref{fig:zone_size} shows the share
+of zones with 11-table RSSZ above 1 by size quintile. SA-Only has none;
+CP-only + SA stays at or below 5.4\%; CP-MIP has a 5.4\% tail in Q1, the
+control-table conflict zone, and is near zero elsewhere; MIP+SA rises overall
+from 5.4\% in Q1 to 20.3\% in Q5. The MIP+SA blow-ups are therefore not a
+small-zone artefact: they grow with zone size, consistent with the
+\texttt{nprd}/\texttt{mtwp} composition mechanism above. The per-zone values are
+released with the code.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{fig_zone_size.png}
-\caption{Scaling with zone size on the fitted cohort, grouped into
-census-population quintiles from smallest (Q1) to largest (Q5).
-\textbf{(a)} Median 11-table RSSZ per quintile for SA-Only, IPU-Only,
-CP-only + SA, the composition-filtered pool + SA (Comp. pool + SA), and CP-MIP.
-\textbf{(b)} The share of zones in each quintile that beat SA-Only; SA-Only is
-the baseline and is therefore not drawn. The rank order is stable across the
-size range; the per-zone values behind the figure are released with the code.}
+\includegraphics[width=0.78\textwidth]{fig_zone_size.png}
+\caption{Tail share by zone size on the fitted cohort, grouped into
+census-population quintiles from smallest (Q1) to largest (Q5). The y-axis is
+the share of zones with 11-table RSSZ above 1 for SA-Only, IPU-Only,
+CP-only + SA, the composition-filtered pool + SA (Comp. pool + SA), CP-MIP,
+MIP+SA and MIP+IPU. SA-Only has no zones above the threshold; CP-MIP's only
+tail is Q1, the control-table conflict zone; MIP+SA rises overall to 20.3\% in
+Q5. The per-zone values behind the figure are released with the code.}
 \label{fig:zone_size}
 \end{figure}
 

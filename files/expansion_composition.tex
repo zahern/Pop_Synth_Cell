@@ -6,8 +6,8 @@ set it selects. To expose the distinction, a full-menu build appends the
 remaining candidate menu after the solve; those appended records are not part of
 the admission vector, are not in the deviation terms and are not subject to the
 composition tie-break. The result is a pool that is cell-complete but
-compositionally skewed, with a surplus of size-7 households and \texttt{mtwp}
-code 17. Table~\ref{tab:expansion_composition} reports the base pool, that
+compositionally skewed, with a surplus of \texttt{nprd} code-7 (residual/not-applicable)
+households and \texttt{mtwp} code 17. Table~\ref{tab:expansion_composition} reports the base pool, that
 build and the controlled variants. It is read in three blocks: the released
 build, the 300-donor controlled variants that isolate the append filter, and the
 2{,}000-donor negative result.
@@ -16,7 +16,7 @@ Two composition-controlled variants were built from the same shards, without
 rerunning the MIP. The \emph{coverage-only} variant keeps the selected support
 set and drops the appended menu. The \emph{composition-aware} variant keeps the
 base pool, the selected set and only those appended households that are neither
-size 7 nor contain \texttt{mtwp} code 17. The implementation also exposes a
+\texttt{nprd} code 7 nor contain \texttt{mtwp} code 17. The implementation also exposes a
 composition-weight multiplier, optional caps and a minimum-admitted-household
 bound; hard caps alone can starve coverage, so the reported variants use the two
 filters. Table~\ref{tab:expansion_composition} reports their composition and
@@ -26,8 +26,7 @@ fitted RSSZ.
 \centering
 \caption{Composition control in the MIP-appended menu. The first block is the
 released build; the second holds the donor menu fixed at 300 donors and varies
-what is appended; the third is the larger-menu negative result. Size-7 is the
-share of households in the \texttt{nprd} code-7 cell; \texttt{mtwp} 17 is the
+what is appended; the third is the larger-menu negative result. NPRD 7 is the share of households in the \texttt{nprd} code-7 cell; in the pool this is a residual/not-applicable code, not a seven-person count; \texttt{mtwp} 17 is the
 share of persons in the ``Not stated'' travel category. The fitted columns are
 11-table RSSZ on the 367-zone fitted cohort. The first row is the unexpanded
 pool, so the second row isolates the expansion step.}
@@ -37,7 +36,7 @@ pool, so the second row isolates the expansion step.}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{@{}lrrrrrrrr@{}}
 \toprule
-Variant & Persons & Households & Size-7 & \texttt{mtwp} 17 & SA mean & SA med. & IPU mean & IPU med. \\
+Variant & Persons & Households & NPRD 7 & \texttt{mtwp} 17 & SA mean & SA med. & IPU mean & IPU med. \\
 \midrule
 \multicolumn{9}{@{}l}{\emph{Released build}} \\
 Base CP pool (no expansion) & 1{,}396{,}342 & 549{,}699 & 5.0\% & 0.0\% & 0.285 & 0.163 & 0.324 & 0.193 \\
@@ -57,7 +56,7 @@ Current MIP-expanded pool & 1{,}463{,}817 & 569{,}024 & 5.6\% & 1.5\% & 0.511 & 
 \end{table}
 
 \par\smallskip
-{\footnotesize\textit{Note:} the 2{,}000-donor rows report composition only; no fit was run on that pool. The filter removes every size-7 and \texttt{mtwp}-17 household by construction, so its 0.0\% entries are definitions rather than outcomes.}
+{\footnotesize\textit{Note:} the 2{,}000-donor rows report composition only; no fit was run on that pool. The filter removes every \texttt{nprd} code-7 and \texttt{mtwp}-17 household by construction, so its 0.0\% entries are definitions rather than outcomes.}
 
 A further build increased the donor menu rather than the shell count.
 Table~\ref{tab:expansion_composition} shows that it is dominated by verbatim

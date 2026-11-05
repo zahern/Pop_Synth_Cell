@@ -1,8 +1,8 @@
-"""Cohort RSSZ by strategy: mean +/- SD and per-zone distribution.
+"""Per-zone RSSZ distribution by strategy, with mean and SD in the labels.
 
 All nine paper arms, 367-zone fitted cohort, 11-table reporting basis.  The
-mean/SD panel shows why the mean alone is misleading: CP-MIP and the IPU arms
-have large SDs driven by the same tail zones that the box panel exposes.
+box panel is deliberately the whole figure: the mean/SD is printed beside each
+arm, but the distribution shows the tail zones that the mean hides.
 """
 import os
 
@@ -43,41 +43,16 @@ def main():
             "median": float(np.median(s)),
         }
 
-    # Sort by mean so the left panel reads monotonically.
     order = sorted(stats, key=lambda k: stats[k]["mean"])
-    y = np.arange(1, len(order) + 1)
     labels = [
         f"{stats[k]['label']}\n{stats[k]['mean']:.3f} $\\pm$ {stats[k]['sd']:.3f}"
         for k in order
     ]
 
-    fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(10.5, 4.6), sharey=True,
-        gridspec_kw={"width_ratios": [1.15, 1]})
-
-    floor = 0.02
-    for i, key in enumerate(order):
-        st = stats[key]
-        lo = max(floor, st["mean"] - st["sd"])
-        hi = st["mean"] + st["sd"]
-        ax1.errorbar(
-            st["mean"], i + 1, xerr=[[st["mean"] - lo], [hi - st["mean"]]],
-            fmt="o", markersize=5.5, color=st["colour"], ecolor=st["colour"],
-            elinewidth=1.4, capsize=3, capthick=1.0)
-        ax1.plot(st["median"], i + 1, marker="|", markersize=9, color="black",
-                 markeredgewidth=1.2)
-    ax1.set_xscale("log")
-    ax1.set_xlim(floor, 40)
-    ax1.set_yticks(y)
-    ax1.set_yticklabels(labels, fontsize=8)
-    ax1.set_xlabel("11-table RSSZ (log scale)")
-    ax1.set_title("mean $\\pm$ 1 SD", fontsize=9)
-    for sp in ("top", "right"):
-        ax1.spines[sp].set_visible(False)
-
+    fig, ax = plt.subplots(figsize=(8.6, 4.7))
     data = [stats[k]["values"] for k in order]
     colours = [stats[k]["colour"] for k in order]
-    bp = ax2.boxplot(
+    bp = ax.boxplot(
         data, vert=False, widths=0.58, patch_artist=True, whis=1.5,
         showfliers=True,
         flierprops=dict(marker=".", markersize=2.5, alpha=0.35,
@@ -90,17 +65,15 @@ def main():
         patch.set_alpha(0.55)
         patch.set_edgecolor("0.25")
     for i, key in enumerate(order):
-        ax2.plot(stats[key]["mean"], i + 1, marker="D", markersize=4.5,
-                 color="black", markerfacecolor="white", markeredgewidth=0.9)
-    # boxplot resets the shared y-axis ticks; restore the arm labels.
-    ax1.set_yticks(y)
-    ax1.set_yticklabels(labels, fontsize=8)
-    ax2.set_xscale("log")
-    ax2.set_xlim(floor, 40)
-    ax2.set_xlabel("11-table RSSZ (log scale)")
-    ax2.set_title("per-zone distribution", fontsize=9)
+        ax.plot(stats[key]["mean"], i + 1, marker="D", markersize=4.5,
+                color="black", markerfacecolor="white", markeredgewidth=0.9)
+    ax.set_xscale("log")
+    ax.set_xlim(0.02, 40)
+    ax.set_yticks(np.arange(1, len(order) + 1))
+    ax.set_yticklabels(labels, fontsize=8)
+    ax.set_xlabel("11-table RSSZ (log scale)")
     for sp in ("top", "right"):
-        ax2.spines[sp].set_visible(False)
+        ax.spines[sp].set_visible(False)
 
     fig.tight_layout()
     fig.savefig(OUT, dpi=220, bbox_inches="tight")
