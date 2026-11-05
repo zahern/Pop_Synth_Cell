@@ -573,7 +573,7 @@ MIP+IPU (comp.) & CP + composition filter & IPU & 367 & 0.302 & 0.211 & 0.196 & 
 
 \textbf{The pool effect under a fixed fitter.} Table~\ref{tab:pool_fitter_matrix} separates the pool effect from the fitter effect. With the fitter held at IPU, the constructed pool lowers both the mean and the median relative to IPU-Only. With the fitter held at SA, the constructed pool is close to SA-Only, while the full-menu MIP append is worse; when the appended menu is composition-filtered, the SA arm matches SA-Only and improves its median. The clean pool contrast is therefore CP-only+IPU against IPU-Only, which share one zone set and differ only by the constructed pool. The constructed pool also differs from the raw microdata in size and composition as well as feasibility, so that pair identifies the pool as a whole rather than the feasibility property alone.
 
-\textbf{The one-MIP arm.} CP-MIP replaces the selection/weighting fitter with one integer program per zone. It chooses an integer replication count for every candidate household in the zone's SA4 slice, minimising missed control cells first and table deviations second, with a pool-anchored soft block for joint and uncontrolled attributes. Table~\ref{tab:pool_fitter_matrix} shows that it has the lowest median RSSZ of any arm, although its mean is not the lowest: two zones, 302031036 and 316071546, return a 120-second incumbent and carry most of its tail. Table~\ref{tab:full_audit} shows the cost, with the highest within-zone duplication and joint TVD, so the marginal median is bought by replication rather than a richer joint structure. A 19-zone sweep shows that the in-sample optimum is not the held-out optimum; the released sweep summary reports the grid, and the reported arm uses a middle setting. The same sweep
+\textbf{The one-MIP arm.} CP-MIP replaces the selection/weighting fitter with one integer program per zone. It chooses an integer replication count for every candidate household in the zone's SA4 slice, minimising missed control cells first and table deviations second, with a pool-anchored soft block for joint and uncontrolled attributes. Table~\ref{tab:pool_fitter_matrix} shows that it has the lowest median RSSZ of any arm, although its mean is not the lowest: two zones, 302031036 and 316071546, return a 120-second incumbent and carry most of its tail; 302031036 is also the zone whose control tables disagree on the person universe, so its value reflects an unsatisfiable target rather than a fitter failure. Table~\ref{tab:full_audit} shows the cost, with the highest within-zone duplication and joint TVD, so the marginal median is bought by replication rather than a richer joint structure. A 19-zone sweep shows that the in-sample optimum is not the held-out optimum; the released sweep summary reports the grid, and the reported arm uses a middle setting. The same sweep
 identifies the duplication lever: the within-zone identical-person share falls
 monotonically as the replication cap is lowered, while the joint-weight setting
 barely changes it, so the held-out-winning setting is also the least duplicating
@@ -593,20 +593,20 @@ cell, the miss count in the released CP-MIP summary records it, and those misses
 concentrate in the two pool-gap zones that dominate its own tail, 302031036 and
 316071546.
 
-Table~\ref{tab:pathological_zones} isolates the zones where the constructed-pool fitters fail. In 302031036 the pool lacks the dwelling records needed for \texttt{rntrd}, \texttt{mrerd} and \texttt{vehrd}; in 112011237 the failure is the household-size trade-off discussed above. The zones are pool gaps, not evidence about the fitter, and remain in the cohort means.
+Table~\ref{tab:pathological_zones} isolates the zones where the constructed-pool fitters fail. In 302031036 the pool lacks the dwelling records needed for \texttt{rntrd}, \texttt{mrerd} and \texttt{vehrd}, and its person tables disagree on the universe (seven total 125--128, six total 837--851); in 112011237 the failure is the household-size trade-off discussed above. Both are data or pool defects, not evidence about the fitter, and remain in the cohort means.
 
 \input{files/pathological_zones.tex}
 
-Table~\ref{tab:cp_sa_tail} separates search budget from pool composition on the worst MIP+SA zones. A longer seeded run improves four of the five; the fifth, the pathological pool gap, is worse under the seed because the pool cannot source its dwelling cells. The tail is therefore partly budget- and initialization-limited.
+Table~\ref{tab:cp_sa_tail} separates search budget from pool composition on the worst MIP+SA zones. A longer seeded run improves four of the five; the fifth, 302031036, is worse under the seed, but its control tables disagree on the person universe, so that row is a data defect rather than an iteration-budget effect. The tail is therefore partly budget- and initialization-limited.
 
 \input{files/cp_sa_tail.tex}
 
-\textbf{Scaling with zone size.} \cref{fig:zone_size} splits the fitted cohort
+\textbf{Scaling with zone size.} Figure~\ref{fig:zone_size} splits the fitted cohort
 into census-population quintiles. The rank order of the arms barely moves across
 the size range: SA-Only's median is nearly flat in size, CP-MIP's advantage over
-it holds in every quintile, and the CP-only + SA arms lose ground only in the
-largest quintile. Win rates against SA-Only track the same pattern, so the
-pool-to-pool conclusions above are not an artefact of zone mix.
+it holds in every quintile, and the CP-only + SA arms narrow their advantage in
+the two largest quintiles. Win rates against SA-Only track the same pattern, so
+the pool-to-pool conclusions above are not an artefact of zone mix.
 
 \begin{figure}[t]
 \centering
@@ -654,17 +654,19 @@ control tables are summarised in Figure~\ref{fig:marginals_all_tables}.}
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{fig_fit_example.png}
-\caption{Worked example on one mid-cohort SA2 zone (301011004), chosen as a
-typical zone rather than the tail. \textbf{(a)} The 11-table RSSZ of the seven
-core arms on this zone, grouped by pool: the first two fit raw microdata, the
-next three fit the CP feasible pool, and the last two fit the MIP-expanded
-pool. \textbf{(b)} The same zone's per-table residuals under CP-only + SA and
-CP-MIP on the 19-table fitting objective, sorted by the SA arm's value. On this
-zone the one-MIP fit lowers the residual on every table rather than trading one
-table against another; its cost is the within-zone duplication reported in
-Table~\ref{tab:full_audit}, not a marginal regression. The zone is illustrative
-of the mechanism, not a cohort estimate; cohort values are in
-Tables~\ref{tab:pool_fitter_matrix} and~\ref{tab:full_audit}.}
+\caption{Worked example on one mid-cohort SA2 zone (309051244), chosen because
+it sits near the cohort median for the core arms rather than in the tail.
+\textbf{(a)} The 11-table RSSZ of the seven core arms on this zone, grouped by
+pool: the first two fit raw microdata, the next three fit the CP feasible pool,
+and the last two fit the MIP-expanded pool. \textbf{(b)} The same zone's
+per-table residuals under CP-only + SA and CP-MIP on the 19-table fitting
+objective, sorted by the SA arm's value; the bars decompose the 19-table
+objective and are not on the same scale as panel (a). The one-MIP fit lowers
+the residual on every table except \texttt{typp}, where it pays a small
+increase; its larger cost is the within-zone duplication reported in
+Table~\ref{tab:full_audit}. The zone is illustrative of the mechanism, not a
+cohort estimate; cohort values are in Tables~\ref{tab:pool_fitter_matrix}
+and~\ref{tab:full_audit}.}
 \label{fig:fit_example}
 \end{figure}
 

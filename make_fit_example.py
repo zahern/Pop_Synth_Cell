@@ -1,8 +1,9 @@
 """Worked example of what the pipeline stages add, for one SA2 zone.
 
-Zone 301011004. Panel A: 11-table RSSZ by arm for the same zone, showing what
-each stage contributes. Panel B: the same zone's per-table residuals under
-CP-only + SA and CP-MIP, showing where the one-MIP fit removes the residual.
+Zone 309051244, a median-fit zone for the core arms. Panel A: 11-table RSSZ by
+arm, showing what each stage contributes. Panel B: the same zone's per-table
+residuals under CP-only + SA and CP-MIP, showing where the one-MIP fit removes
+the residual.
 
 No titles: the figure is described in the caption.
 """
@@ -19,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIG_DIR = os.path.join(HERE, "outputs", "paper_figures")
 os.makedirs(FIG_DIR, exist_ok=True)
 
-ZONE = "301011004"
+ZONE = "309051244"
 ARMS = pd.read_csv(os.path.join(HERE, "outputs", "paper_arms",
                                 "paper_arms_zones.csv"))
 ARMS["zone"] = ARMS["zone"].astype(str)
