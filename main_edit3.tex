@@ -603,9 +603,11 @@ control tables use code 7 as a seven-person size category. A fitter therefore
 treats residual households as size-7 carriers. In 316071546, the one-MIP arm
 selects 902 code-7 households, mostly one or two persons, against a control
 target of two size-7 households; its \texttt{nprd} RSSZ is 20.4. The same
-collision drives the \texttt{nprd} component of the MIP+SA tail. Recoding code 7
-in the pool to a separate not-applicable flag, and excluding it from the size
-control, is the correct fix; it is not done in the released run.
+collision drives the \texttt{nprd} component of the MIP+SA tail. A corrected
+pool that recomputes \texttt{nprd} from household membership and marks
+\texttt{HHCD} 5--7 as not applicable is released with the code
+(\texttt{fix\_nprd\_coding.py}); it is not used for the reported results, which
+remain the uncorrected build.
 
 \textbf{The pool effect under a fixed fitter.} Table~\ref{tab:pool_fitter_matrix} separates the pool effect from the fitter effect. With the fitter held at IPU, the constructed pool lowers both the mean and the median relative to IPU-Only. With the fitter held at SA, the constructed pool is close to SA-Only, while the full-menu MIP append is worse; when the appended menu is composition-filtered, the SA arm matches SA-Only and improves its median. The clean pool contrast is therefore CP-only+IPU against IPU-Only, which share one zone set and differ only by the constructed pool. The constructed pool also differs from the raw microdata in size and composition as well as feasibility, so that pair identifies the pool as a whole rather than the feasibility property alone.
 
