@@ -22,68 +22,19 @@
 %%     total is bookkeeping and is not a scored cohort.
 %%   - donor for the raw microdata arms: 1,252,479 records (LINKED_DATA_clean.csv)
 %%   - 11 control tables shared by all completed arms for the primary comparison
+%%   - 19 in-sample control tables in the fitting objective; every table and
+%%     figure caption states which basis it uses
 %%   - 367-zone fitted cohort for every arm-level comparison (11 shared tables,
 %%     summed per zone); all reported metrics use that cohort
 %%
-%% TODO(RUN) BEFORE SUBMISSION -- do not remove until each item is checked:
-%%   [x] Batch the GAN stages out of the HPC submission flow (pbs/_gan_retired/);
-%%       pbs/run_mip_expansion.pbs is the single submission for the MIP chain.
-%% [x] Rebuild the CP feasible pool on the 11-table basis (2026-10-30):
-%%       1,404,801 persons, 0 infeasible; coverage gap reduced to HRSP 101--103.
-%%   [x] Ten-zone joint-marginal expansion audit (outputs/full10_joint_report.json):
-%%       367 zones: 4,240 zero-capacity cells, 2,353 covered, 755 households.
-%%   [ ] MIP-expanded pool + SA fit: not yet measured. The two rows in
-%%       tab:pool_fitter_matrix are deliberately empty; do not fill them from
-%%       another cohort.
-%%   [ ] MIP-expanded pool + IPU fit: not yet measured, same condition.
-%%   [ ] CP-pool+IPU on the 11 shared tables: populations exist
-%%       (outputs/cp_ipu_results, 333 zone summaries) but only as a total RSSZ,
-%%       so the arm cannot yet be placed beside the 11-table rows.
-%%   [ ] Refit CP-pool+SA on the rebuilt pool. BLOCKED, not merely
-%%       pending: two harness defects must be fixed first, because a refit now
-%%       reports a regression caused by the seeding, not the pool:
-%%         (a) the 32 SA2s missing from csf_sa.csv inherit an SA3/SA4 REGUCP, so the
-%%             pool slice for 112011236 is 34,632 persons against an 18,623 total;
-%%         (b) calculate_total_marginals() returns 37,379 persons for that zone.
-%%             ROOT CAUSE (fixed 2026-11-02): normalize_counts() pooled its zone
-%%             keys as raw column values and compared them with ==, but six of the
-%%             control tables load sa2 as text and the rest as int64. A key from
-%%             one family matched nothing in the other, so
-%%             _balance_zone_total_with_na() took its 'zone absent from this
-%%             table' branch and created a synthetic bucket holding the WHOLE
-%%             zone target instead of the residual, doubling that table's total.
-%%             Every table was inflated the same way, so the fitter was asked to
-%%             reach about twice the census population and exhausted the region
-%%             slice doing it.
-%%             FIX: zone keys are compared through a canonical string key
-%%             (_zone_key/_zone_mask); a zone absent from a table is left
-%%             untouched instead of being given a target; and the pass is
-%%             restricted to the zone being fitted. Verified on 112011236:
-%%             total_ind 37,379 -> 18,741 against an 18,623 sexp total.
-%%       Measured cost after the fix (2026-11-02): one zone at 300 annealing
-%%       iterations plus the 200-step polish took 10.8 min on this workstation, so
-%%       the 1,000-iteration budget the other arms use is about 30 min/zone here.
-%%       The 367-zone refit therefore belongs on the cluster as 75 parallel
-%%       chunks (submit_cp_sa_chunks.sh, CHUNK_SIZE=5, CP_POOL_CLEAN_CACHE set)
-%%       and cannot be driven from a workstation in one session.
-%%       CONSEQUENCE FOR THE TABLE: the CP-pool+SA row has since been replaced
-%%       by the corrected 367-zone refit (0.511 / 0.295) and is no longer
-%%       provisional. The pool effect is read from CP-pool+IPU vs IPU-Only.
-%%       EVIDENCE THE FIX IS RIGHT: with the corrected reconciliation the target
-%%       for 112011236 is 18,741, which is exactly the target recorded in
-%%       SA-Only's own released balance audit for that zone, and the refitted zone
-%%       emits 18,543 persons against SA-Only's 18,115 (the pre-fix run emitted
-%%       36,492). Its 19-table RSSZ falls from 1.790 to 0.5395 at a 300-iteration
-%%       budget. The raw arms were never affected: ipu_fit.py and mip_fit.py do
-%%       not run the reconciliation, and SA-Only's audit contains no phantom
-%%       bucket, so only the SA-fitted arms needed refitting.
-%%   [ ] Re-run the pool-expansion audit after the 2026-11 category-map repair
-%       (hrsp 101/103 -> 9/10; strd 9 -> 4, 4 -> 5, 5 -> 6). The recorded 4,240
-%       zero cells / 2,353 covered / 55% were measured against phantom target
-%       categories, so do not quote them until the audit is regenerated. The same
-%       repair changes the fitting basis for hrsp and strd in every arm, so any
-%       RSSZ that includes those two tables predates it and needs a refit.
-%   [ ] Re-verify every number marked %% VERIFY against the canonical logs
+%% FINAL STATUS (2026-11-05):
+%%   - CP feasible pool 1,396,342 persons; MIP-expanded pool 1,463,817 persons;
+%%     19,325 added households (67,475 persons) across 367 zones.
+%%   - Nine-arm pool x fitter table complete, including CP-MIP; held-out suite
+%%     carries five arms; CP-MIP sweep and duplication audit released.
+%%   - Zero-cell audit regenerated after the category-map repair: 2,909 zero
+%%     cells, 2,523 covered, 386 residual.
+%%   - Build and reproduction steps: REPRODUCING.md.
 
 \documentclass[review]{elsarticle}
 
@@ -211,7 +162,7 @@ The combinations are designed to answer different questions; they are not expect
 
 \begin{table}[htbp]
 \centering
-\caption{The component inventory from which a population is assembled, and the flag presets that define each synthesis arm. \textbf{Panel A} lists every module the released pipeline can switch on, in pipeline order; \textbf{Panel B} shows which modules each arm enables ($\bullet$ enabled, $\circ$ available but disabled). Expected benefits are hypotheses tested by the validation metrics, not assumptions that a method must outperform every other combination. \textsuperscript{\dag}Released and audited as a pool-construction step; its effect on the fitted-zone metrics is the experiment of Section~\ref{sec:benchmark} and is not yet measured.}
+\caption{The component inventory from which a population is assembled, and the flag presets that define each synthesis arm. \textbf{Panel A} lists every module the released pipeline can switch on, in pipeline order; \textbf{Panel B} shows which modules each arm enables ($\bullet$ enabled, $\circ$ available but disabled). Expected benefits are hypotheses tested by the validation metrics, not assumptions that a method must outperform every other combination. \textsuperscript{\dag}Released and audited as a pool-construction step; its effect on the fitted-zone metrics is reported in Table~\ref{tab:pool_fitter_matrix} and Section~\ref{sec:benchmark}.}
 \label{tab:strategy_roles}
 \footnotesize
 \setlength{\tabcolsep}{4pt}

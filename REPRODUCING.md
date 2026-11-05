@@ -10,6 +10,18 @@ that `config.py` points at the census microdata. `python` means the `syn_env`
 environment; on the HPC every python command is run inside a PBS job (the
 `pbs/*.pbs` scripts), never on the login node.
 
+## Building the paper
+
+The paper source is in this directory. A clean clone has no `.bbl`, so run
+BibTeX once before the final LaTeX passes:
+
+```bash
+pdflatex -interaction=nonstopmode main_edit3.tex
+bibtex main_edit3
+pdflatex -interaction=nonstopmode main_edit3.tex
+pdflatex -interaction=nonstopmode main_edit3.tex
+```
+
 ## Pipeline
 
 ### 1. CP feasible pool

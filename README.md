@@ -128,6 +128,20 @@ table, the 11 control tables shared by every arm. The held-out tables
 (`age5p`, `assnp`, `bedrd`, `hcfmf`, `hhcd`, `lfsp`, `tenlld`) are never used
 in fitting.
 
+## Build the paper
+
+A clean clone has no `.bbl`, so run BibTeX before the final LaTeX passes:
+
+```bash
+pdflatex -interaction=nonstopmode main_edit3.tex
+bibtex main_edit3
+pdflatex -interaction=nonstopmode main_edit3.tex
+pdflatex -interaction=nonstopmode main_edit3.tex
+```
+
+The source is self-contained apart from the ABS microdata and fitted
+populations, which are not redistributed.
+
 ## Reproducibility notes
 
 - Seeds are fixed in the scripts and in the PBS environment; the SA runs are
