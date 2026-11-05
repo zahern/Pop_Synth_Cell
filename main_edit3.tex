@@ -709,40 +709,41 @@ panel, not a cohort-level estimate.}
 \begin{table}[h!]
 \centering
 \caption{Category-level composition of the \texttt{heap} (highest educational attainment)
-marginal, in per cent of persons, on the shared 60-zone cohort under the 19-table
-fitting basis. \texttt{heap} is the control
-table the fit is asked to match on educational attainment, so each row is one attainment
+marginal, in per cent of persons, on the 367-zone fitted cohort and the 11-table reporting
+basis. \texttt{heap} is one of the shared 11 control tables, so each row is one attainment
 level and a well-fitted arm reproduces the census column. This is the table whose coding was
 repaired before this run: in the raw ABS export the two certificate rows are transposed,
 which had placed the 12.7\% certificate group on the wrong level.}
 \label{tab:heap_categories}
 \footnotesize
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{@{}lrrrrr@{}}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
 \textbf{Attainment level} & \textbf{Census} & \textbf{SA-Only} & \textbf{IPU-Only} &
-\textbf{CP-SA} & \textbf{CP-IPU} \\
+\textbf{CP-SA} & \textbf{CP-IPU} & \textbf{CP-MIP} \\
 \midrule
-Postgraduate degree              &  3.9 &  3.9 &  3.7 &  3.7 &  3.5 \\
-Graduate diploma/certificate     &  2.1 &  2.0 &  1.8 &  1.9 &  1.7 \\
-Bachelor degree                  & 13.8 & 13.4 & 12.7 & 12.8 & 12.3 \\
-Advanced diploma                 &  8.6 &  8.6 &  7.9 &  8.1 &  7.5 \\
-Certificate III \& IV            & 15.3 & 16.2 & 15.4 & 15.4 & 14.8 \\
-Secondary, year 10 and above     & 22.3 & 24.4 & 23.9 & 25.0 & 23.5 \\
-Certificate I \& II              &  1.7 &  0.1 &  0.1 &  0.1 &  0.0 \\
-Secondary, year 9 or below       &  2.1 &  5.8 &  5.3 &  6.0 &  5.3 \\
-Supplementary codes              &  1.1 &  2.5 &  2.3 &  2.5 &  2.2 \\
-Not stated                       &  7.4 &  6.3 &  5.0 &  5.3 &  4.6 \\
-Not applicable                   & 21.7 & 16.9 & 22.1 & 19.2 & 24.5 \\
+Postgraduate degree              &  4.5 &  4.7 &  4.4 &  4.6 &  4.3 &  4.6 \\
+Graduate diploma/certificate     &  2.0 &  2.1 &  1.9 &  1.9 &  1.8 &  2.0 \\
+Bachelor degree                  & 13.7 & 14.4 & 13.3 & 13.9 & 13.2 & 14.1 \\
+Advanced diploma                 &  8.3 &  8.5 &  7.7 &  7.9 &  7.5 &  8.6 \\
+Certificate III \& IV            & 14.6 & 15.1 & 13.8 & 13.7 & 13.5 & 15.5 \\
+Secondary, year 10 and above     & 22.0 & 24.1 & 23.6 & 24.4 & 23.3 & 23.7 \\
+Certificate I \& II              &  1.5 &  0.1 &  0.1 &  0.1 &  0.1 &  0.2 \\
+Secondary, year 9 or below       &  1.9 &  4.9 &  4.7 &  5.1 &  4.7 &  2.5 \\
+Supplementary codes              &  1.3 &  2.5 &  2.3 &  2.3 &  2.2 &  1.3 \\
+Not stated                       &  7.7 &  6.0 &  6.8 &  5.1 &  4.5 &  7.6 \\
+Not applicable                   & 22.5 & 17.6 & 21.3 & 20.8 & 24.9 & 19.8 \\
 \bottomrule
 \end{tabular}
 \end{table}
 {\footnotesize\textit{Note:} the repaired coding places the large certificate group on
 Certificate III \& IV and the small one on Certificate I \& II. Every arm still falls
 short on Certificate I \& II because the fused microdata holds few persons at that level;
-the residual is a property of the sample, not of any arm. ``Not applicable'' shows the
-largest cross-arm spread, consistent with the household-composition difference reported in
-the text.}
+the residual is a property of the sample, not of any arm. Code 12 is below 0.3\% in every
+arm and is omitted. ``Not applicable'' shows the largest cross-arm spread, consistent with
+the household-composition difference reported in the text; CP-MIP's smaller share there and
+its larger Year 10+ share are the marginal cost of replication noted in the caption of
+Figure~\ref{fig:marginal_differences}.}
 
 
 \FloatBarrier
