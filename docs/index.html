@@ -229,7 +229,7 @@
       <span class="pill">Cohort <b>362 zones</b></span>
       <span class="pill">Fitting basis <b>19 tables</b></span>
       <span class="pill">Held-out <b>7 tables</b></span>
-      <a class="pill" href="main_edit3_latest.pdf">Paper PDF</a>
+      <a class="pill" href="../main_edit3.pdf">Paper PDF</a>
     </div>
   </header>
 
@@ -240,6 +240,7 @@
         <select id="method"></select>
         <label for="zone">Zone</label>
         <select id="zone"></select>
+        <button id="random-zone" title="Pick a random fitted zone">Random zone</button>
         <button id="reset" title="Reset map view">Reset view</button>
         <span id="map-hint" style="font-size:11px;color:var(--faint);margin-left:auto;">Scroll to zoom · drag to pan · click a zone</span>
       </div>
@@ -563,6 +564,12 @@
 
   document.getElementById("reset").addEventListener("click", () => {
     state.zoom = 1; state.panX = 0; state.panY = 0; draw();
+  });
+
+  document.getElementById("random-zone").addEventListener("click", () => {
+    const pool = FITTED.filter((z) => ZONE[z] && !ZONE[z].special);
+    if (!pool.length) return;
+    selectZone(pool[Math.floor(Math.random() * pool.length)]);
   });
 
   // -------------------------------------------------------------- details
