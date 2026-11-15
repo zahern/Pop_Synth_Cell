@@ -40,6 +40,10 @@ observed and synthesized marginal shares.
   112011236: census target against the raw SA4 slice, CP pool and expanded pool.
 - `fig_method_table_heatmap.png` - mean per-zone RSSZ by method and control
   table, with the best arm starred in each column.
+- `fig_pool_tvd_by_size.png` - pool-target marginal distance by zone population
+  quintile, before fitting.
+- `fig_pool_progression_by_size.png` - field-of-study and household-size
+  progression for five zones spanning the size distribution.
 
 ## Data and caveats
 
