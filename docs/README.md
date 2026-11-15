@@ -34,12 +34,14 @@ observed and synthesized marginal shares.
 
 ## Static figures
 
-- `fig_rssz_by_arm.png` - per-zone RSSZ boxplots, split by pool coverage, with
-  the fitting method on each row.
+- `fig_rssz_by_arm.png` - per-zone RSSZ boxplots for the unified CP--MIP method
+  and its three block ablations.
 - `fig_zone_progression_all.png` - four-table marginal progression for SA2
   112011236: each pool stage against the census marginal.
-- `fig_method_table_heatmap.png` - mean per-zone RSSZ by method and control
-  table, with the best arm starred in each column.
+- `fig_method_table_heatmap.png` - mean per-zone RSSZ by configuration and
+  control table, with the best configuration starred in each column.
+- `fig_table_delta_heatmap.png` - per-table RSSZ change relative to CP-only for
+  the three block ablations.
 - `fig_pool_tvd_by_size.png` - pool-target marginal distance by zone population
   quintile, before fitting.
 - `fig_pool_score_summary.png` - marginal distance, zero-cell coverage and their
