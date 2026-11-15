@@ -13,6 +13,14 @@ with mixed-integer-selected donor--shell households for zero-capacity cells,
 fits each SA2 zone by simulated annealing (SA), iterative proportional updating
 (IPU), or a single integer-count MIP, and scores the arms on a common cohort.
 
+## Interactive dashboard
+
+The per-zone results are browsable at
+**<https://zahern.github.io/Pop_Synth_Cell/>**. The dashboard shows the SA2 map
+coloured by per-zone RSSZ, per-table residuals for every arm, the cohort-level
+observed-versus-synthesized marginals, and the `qalfp` progression for every
+zone. Its source and data live in [`docs/`](docs/).
+
 ## Pipeline
 
 | Stage | What it does | Main entry point |

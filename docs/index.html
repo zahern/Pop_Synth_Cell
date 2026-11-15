@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Population synthesis fit dashboard</title>
+<style>
+  :root {
+    --bg: #F3F5FB;
+    --surface: #FFFFFF;
+    --surface-2: #EBEFFA;
+    --surface-3: #E3E8F7;
+    --text: #171B2C;
+    --muted: #545F7E;
+    --faint: #8089A8;
+    --primary: #1E2761;
+    --primary-2: #2E3B8E;
+    --teal: #1C7293;
+    --amber: #C85A14;
+    --good: #2E7D6B;
+    --bad: #B23A3A;
+    --border: #DCE1F0;
+    --shadow: 0 10px 30px -14px rgba(30, 39, 97, 0.22);
+    --radius: 10px;
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", ui-serif, serif;
+    --font-body: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0B0E1C;
+      --surface: #131A30;
+      --surface-2: #1A2340;
+      --surface-3: #212B4C;
+      --text: #E9ECF8;
+      --muted: #A2ACCE;
+      --faint: #6C77A0;
+      --primary: #8C98E8;
+      --primary-2: #AEB8F2;
+      --teal: #5FC3DD;
+      --amber: #F0A46A;
+      --good: #6FD3B6;
+      --bad: #F08A8A;
+      --border: #2B3555;
+      --shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.55);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  a { color: var(--teal); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1680px; margin: 0 auto; padding: 22px 26px 50px; }
+  header.hero {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 22px; flex-wrap: wrap; margin-bottom: 18px;
+  }
+  header.hero h1 {
+    font-family: var(--font-display); font-weight: 600; font-size: 30px;
+    letter-spacing: -0.02em; margin: 0 0 4px; color: var(--primary);
+  }
+  header.hero p { margin: 0; color: var(--muted); max-width: 900px; }
+  .hero-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--surface); color: var(--muted); font-size: 12px;
+  }
+  .pill b { color: var(--text); font-weight: 600; }
+  .layout {
+    display: grid; grid-template-columns: minmax(0, 1.32fr) minmax(380px, 0.92fr);
+    gap: 18px; align-items: start;
+  }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+  @media (min-width: 1101px) { .map-panel { position: sticky; top: 14px; } }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .map-panel { position: relative; overflow: hidden; }
+  .map-toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 11px 14px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  }
+  .map-toolbar label { font-size: 12px; color: var(--muted); font-weight: 600; }
+  select, button {
+    font-family: var(--font-body); font-size: 13px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 9px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--teal); }
+  .map-wrap { position: relative; height: 640px; background: var(--surface); }
+  @media (max-width: 1100px) { .map-wrap { height: 520px; } }
+  #map { width: 100%; height: 100%; display: block; cursor: grab; }
+  #map.dragging { cursor: grabbing; }
+  #tooltip {
+    position: absolute; pointer-events: none; display: none; z-index: 8;
+    background: rgba(30, 39, 97, 0.94); color: #fff; padding: 8px 11px;
+    border-radius: 6px; font-size: 12px; line-height: 1.45; white-space: nowrap;
+    box-shadow: 0 8px 22px -8px rgba(0,0,0,0.45);
+  }
+  .legend {
+    position: absolute; left: 14px; bottom: 14px; z-index: 5;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    font-size: 11px; color: var(--muted); backdrop-filter: blur(4px);
+  }
+  .legend .bar {
+    height: 9px; width: 210px; border-radius: 4px; margin: 4px 0 3px;
+    background: linear-gradient(90deg, #2a78d6, #1baf7a, #eda100, #e34948);
+  }
+  .legend .ticks { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; }
+  .map-note {
+    position: absolute; right: 14px; bottom: 14px; z-index: 5;
+    font-size: 11px; color: var(--faint); text-align: right;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    padding: 5px 8px; border-radius: 6px;
+  }
+  .detail { padding: 16px 17px 18px; }
+  .zone-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .zone-head h2 { font-family: var(--font-display); font-size: 22px; margin: 0 0 2px; color: var(--primary); }
+  .zone-head .code { font-family: var(--font-mono); font-size: 12px; color: var(--faint); }
+  .zone-rssz { text-align: right; }
+  .zone-rssz .v { font-family: var(--font-display); font-size: 27px; color: var(--primary); line-height: 1; }
+  .zone-rssz .l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 999px;
+    background: var(--surface-3); color: var(--muted); margin-left: 6px;
+  }
+  .badge.special { background: #f3e1d2; color: #8a4a16; }
+  .cards {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px; margin: 13px 0 4px;
+  }
+  @media (max-width: 620px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 9px; }
+  .card .k { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.06em; }
+  .card .v { font-size: 17px; font-weight: 650; color: var(--text); margin-top: 1px; }
+  .card .s { font-size: 10px; color: var(--faint); }
+  h3.sec {
+    font-family: var(--font-display); font-size: 16px; color: var(--primary);
+    margin: 17px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+  }
+  .bars { display: grid; gap: 4px; }
+  .bar-row {
+    display: grid; grid-template-columns: 104px minmax(0, 1fr) 52px;
+    gap: 8px; align-items: center; font-size: 11px; cursor: pointer;
+    padding: 2px 3px; border-radius: 4px;
+  }
+  .bar-row:hover { background: var(--surface-2); }
+  .bar-row.active { background: var(--surface-3); }
+  .bar-row .name { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-row .track { height: 8px; background: var(--surface-3); border-radius: 999px; overflow: hidden; }
+  .bar-row .fill { height: 100%; border-radius: 999px; background: var(--teal); }
+  .bar-row .val { font-family: var(--font-mono); text-align: right; color: var(--text); }
+  .bar-row.active .fill { background: var(--amber); }
+  .marginal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .marginal-head .sub { font-size: 11px; color: var(--faint); }
+  .marg-table-wrap { max-height: 310px; overflow: auto; border: 1px solid var(--border); border-radius: 7px; }
+  table.marg { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table.marg th {
+    position: sticky; top: 0; background: var(--surface-2); color: var(--muted);
+    text-align: right; font-weight: 600; padding: 5px 6px; border-bottom: 1px solid var(--border);
+    z-index: 1;
+  }
+  table.marg th:first-child, table.marg td:first-child { text-align: left; }
+  table.marg td { padding: 4px 6px; border-bottom: 1px solid var(--border); text-align: right; font-family: var(--font-mono); }
+  table.marg td.lab { font-family: var(--font-body); color: var(--muted); }
+  table.marg tr:last-child td { border-bottom: 0; }
+  .mini { display: inline-flex; gap: 2px; align-items: center; width: 92px; justify-content: flex-end; }
+  .mini i { display: block; height: 6px; border-radius: 999px; }
+  .mini .obs { background: var(--faint); }
+  .mini .syn { background: var(--teal); }
+  .diff-pos { color: var(--bad); }
+  .diff-neg { color: var(--good); }
+  .note { font-size: 11px; color: var(--faint); margin-top: 7px; }
+  .method-line { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+  .method-line span { font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); padding: 2px 7px; border-radius: 999px; }
+  .comparison { margin-top: 18px; overflow: hidden; }
+  .comparison .head { padding: 13px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .comparison .head h2 { font-family: var(--font-display); margin: 0; font-size: 20px; color: var(--primary); }
+  .comparison .head p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+  .table-scroll { overflow: auto; }
+  table.compare { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 980px; }
+  table.compare th {
+    background: var(--surface-2); color: var(--muted); text-align: right;
+    padding: 8px 9px; border-bottom: 1px solid var(--border); font-weight: 600; white-space: nowrap;
+  }
+  table.compare th:first-child, table.compare th:nth-child(2), table.compare th:nth-child(3) { text-align: left; }
+  table.compare td { padding: 7px 9px; border-bottom: 1px solid var(--border); text-align: right; font-family: var(--font-mono); white-space: nowrap; }
+  table.compare td:first-child, table.compare td:nth-child(2), table.compare td:nth-child(3) { text-align: left; font-family: var(--font-body); }
+  table.compare tr { cursor: pointer; }
+  table.compare tbody tr:hover { background: var(--surface-2); }
+  table.compare tbody tr.active { background: var(--surface-3); }
+  table.compare tbody tr.active td:first-child { box-shadow: inset 3px 0 0 var(--amber); }
+  .methods { margin-top: 18px; padding: 16px 17px 18px; }
+  .methods h2 { font-family: var(--font-display); margin: 0 0 4px; font-size: 20px; color: var(--primary); }
+  .methods .intro { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+  .method-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 1000px) { .method-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .method-grid { grid-template-columns: 1fr; } }
+  .method-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 11px; background: var(--surface-2); }
+  .method-card.active { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber) inset; }
+  .method-card h4 { margin: 0 0 2px; font-size: 13px; color: var(--text); }
+  .method-card .meta { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; }
+  .method-card p { margin: 6px 0 0; font-size: 11px; color: var(--muted); }
+  .footer { margin-top: 18px; color: var(--faint); font-size: 11px; line-height: 1.6; }
+  .footer b { color: var(--muted); }
+  .kbd { font-family: var(--font-mono); background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <h1>Population synthesis fit dashboard</h1>
+      <p>Per-zone fit of the paper's completed strategies on the 362-zone fitted cohort, with cohort-level observed versus synthesized marginal shares. Hover the map, click a zone, and switch method or table.</p>
+    </div>
+    <div class="hero-tools">
+      <span class="pill">Cohort <b>362 zones</b></span>
+      <span class="pill">Fitting basis <b>19 tables</b></span>
+      <span class="pill">Held-out <b>7 tables</b></span>
+      <a class="pill" href="main_edit3_latest.pdf">Paper PDF</a>
+    </div>
+  </header>
+
+  <div class="layout">
+    <section class="panel map-panel">
+      <div class="map-toolbar">
+        <label for="method">Method</label>
+        <select id="method"></select>
+        <label for="zone">Zone</label>
+        <select id="zone"></select>
+        <button id="reset" title="Reset map view">Reset view</button>
+        <span id="map-hint" style="font-size:11px;color:var(--faint);margin-left:auto;">Scroll to zoom · drag to pan · click a zone</span>
+      </div>
+      <div class="map-wrap">
+        <canvas id="map"></canvas>
+        <div id="tooltip"></div>
+        <div class="legend">
+          <div style="font-weight:600;color:var(--muted);">Per-zone RSSZ (19 tables)</div>
+          <div class="bar"></div>
+          <div class="ticks" id="legend-ticks"><span>0.05</span><span>0.1</span><span>0.2</span><span>0.5</span><span>1</span><span>2</span><span>5+</span></div>
+        </div>
+        <div class="map-note">Gray = special zone<br>not in fitted cohort</div>
+      </div>
+    </section>
+
+    <aside class="panel detail">
+      <div id="zone-head"></div>
+      <div class="cards" id="method-cards"></div>
+      <div class="method-line" id="method-line"></div>
+      <h3 class="sec">Per-table RSSZ</h3>
+      <div class="bars" id="table-bars"></div>
+      <h3 class="sec">Observed vs synthesized</h3>
+      <div class="marginal-head">
+        <div>
+          <div style="font-weight:600;font-size:12px;" id="marg-title">—</div>
+          <div class="sub" id="marg-sub">Cohort-level shares, 362 fitted zones</div>
+        </div>
+        <select id="table"></select>
+      </div>
+      <div class="marg-table-wrap" style="margin-top:7px;">
+        <table class="marg" id="marg-table"></table>
+      </div>
+      <div class="note">The map and per-table bars are per zone. The marginal table above is the cohort-level observed vs synthesized share for the selected method and table; it is not a per-zone marginal.</div>
+
+      <h3 class="sec">Marginal progression — field of study</h3>
+      <div class="marginal-head">
+        <div>
+          <div style="font-weight:600;font-size:12px;" id="prog-title">—</div>
+          <div class="sub">Target · raw SA4 microdata · CP pool · MIP pool · fitted MIP+SA</div>
+        </div>
+      </div>
+      <div class="marg-table-wrap" style="margin-top:7px;max-height:280px;">
+        <table class="marg" id="prog-table"></table>
+      </div>
+      <div class="note">Raw, CP and MIP are shares of the zone's SA4 candidate slice; target and fitted are shares of the zone. This is the same progression as the paper's zone table. A raw 0.00% means the microdata slice has no carrier for that category.</div>
+    </aside>
+  </div>
+
+  <section class="panel comparison">
+    <div class="head">
+      <div>
+        <h2>Method comparison</h2>
+        <p>Median and mean per-zone RSSZ on the 19-table and 11-table bases; joint and diversity audit on the 367-zone audit cohort (362 fitted plus five special zones). Median zones/tuple and single-zone persons are tuple-spread descriptors, not record-copying measures. Click a row to switch the map.</p>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="compare" id="compare-table"></table>
+    </div>
+  </section>
+
+  <section class="panel methods">
+    <h2>What each method is</h2>
+    <p class="intro">The MIP appears twice. The <b>expansion MIP</b> builds the expanded pool; the <b>fitting MIP</b> is a separate per-zone integer program. Arm names read pool first, fitting method second. CP-MIP is the CP pool fitted by the MIP; MIP+SA and MIP+IPU are conventional fitters on the expanded pool; MIP (direct) is CP construction → MIP expansion → MIP fit.</p>
+    <div class="method-grid" id="method-grid"></div>
+  </section>
+
+  <div class="footer">
+    <b>Data.</b> Per-zone RSSZ from <span class="kbd">zone_table_rssz.csv</span>; cohort marginal shares from <span class="kbd">marginal_category_shares.csv</span>; held-out means from <span class="kbd">heldout_rssz_all.csv</span>; boundaries from the ABS SA2 2021 shapefile. The fitted cohort is 362 zones; the five special zones are shown in gray and excluded from cohort means. The four no-target zones are omitted. The joint/diversity audit is on 367 zones (362 fitted plus five special); median zones/tuple and single-zone persons are descriptive spread measures, not record-copying measures. Marginal shares are cohort-level, not per zone.
+  </div>
+</div>
+
+<script src="data/zones.js?v=2"></script>
+<script src="data/results.js?v=2"></script>
+<script src="data/progression_qalfp.js?v=4"></script>
+<script>
+(function () {
+  "use strict";
+
+  const R = window.DASH_RESULTS;
+  const Z = window.DASH_ZONES;
+  const TABLES = R.tables;
+  const TABLE_LABEL = Object.fromEntries(TABLES.map(t => [t.id, t.label]));
+  const METHODS = R.methods;
+  const METHOD = Object.fromEntries(METHODS.map(m => [m.id, m]));
+  const ZONE = Object.fromEntries(Z.zones.map(z => [z.code, z]));
+  const FITTED = Z.zones.filter(z => !z.special).map(z => z.code);
+
+  const state = {
+    method: "cp_mip_expansion_sa",
+    zone: null,
+    table: "nprd",
+    zoom: 1, panX: 0, panY: 0,
+  };
+
+  const CAT_LABELS = {
+    sexp: {1:"Male", 2:"Female"},
+    nprd: {1:"1", 2:"2", 3:"3", 4:"4", 5:"5", 6:"6", 7:"7+"},
+    heap: {1:"Postgrad", 2:"Grad dip", 3:"Bachelor", 4:"Adv dip", 5:"Cert I/II", 6:"Year 10+", 7:"Cert III/IV", 8:"Year 9-", 9:"Supplementary", 10:"Not stated", 11:"N/A", 12:"Overseas"},
+    strd: {1:"Separate house", 2:"Semi-detached", 3:"Flat/unit", 4:"Other", 5:"Other", 6:"Other", 7:"Other"},
+    vehrd: {0:"0", 1:"1", 2:"2", 3:"3", 4:"4", 5:"5", 6:"6+"},
+    mstp: {1:"Married", 2:"Separated", 3:"Divorced", 4:"Widowed", 5:"Never married", 6:"Not stated"},
+    rlhp: {1:"Partner", 2:"Lone parent", 3:"Child <15", 4:"Dependent student", 5:"Other dependent", 6:"Other relative", 7:"Lone person", 8:"Group household", 9:"Visitor", 10:"Other non-family", 11:"Not applicable (control code 11)"},
+    mtwp: {1:"Train", 2:"Bus", 3:"Ferry", 4:"Tram", 5:"Taxi", 6:"Car driver", 7:"Car passenger", 8:"Truck", 9:"Motorbike", 10:"Bicycle", 11:"Walked", 12:"Other", 13:"Worked at home", 14:"Did not work", 15:"Not stated", 16:"N/A", 17:"Overseas"},
+  };
+  function catLabel(table, cat) {
+    return (CAT_LABELS[table] && CAT_LABELS[table][cat]) || ("Code " + cat);
+  }
+
+  function fmt(v, d) {
+    if (v === null || v === undefined || Number.isNaN(v)) return "—";
+    return Number(v).toFixed(d === undefined ? 3 : d);
+  }
+  function pct(v) {
+    if (v === null || v === undefined || Number.isNaN(v)) return "—";
+    return (100 * v).toFixed(1) + "%";
+  }
+  function rssz(zone, method) {
+    const m = R.rssz[method] && R.rssz[method][zone];
+    return m || null;
+  }
+  function rankOf(zone, method) {
+    const vals = FITTED.map(z => ({z, v: (rssz(z, method) || {}).total}))
+      .filter(o => o.v !== undefined && o.v !== null)
+      .sort((a, b) => a.v - b.v);
+    const i = vals.findIndex(o => o.z === zone);
+    return i < 0 ? null : i + 1;
+  }
+  function dominantTable(zone, method) {
+    const m = rssz(zone, method);
+    if (!m || !m.tables) return "nprd";
+    return Object.entries(m.tables).sort((a, b) => b[1] - a[1])[0][0];
+  }
+
+  // ------------------------------------------------------------------ map
+  const canvas = document.getElementById("map");
+  const ctx = canvas.getContext("2d");
+  const tooltip = document.getElementById("tooltip");
+  let W = 0, H = 0, dpr = 1;
+  let hoverZone = null;
+  let dragging = false, dragMoved = false, lastX = 0, lastY = 0;
+
+  function resize() {
+    const r = canvas.parentElement.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    W = r.width; H = r.height;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  const b = Z.bounds;
+  function base(lon, lat) {
+    const pad = 12;
+    return [
+      pad + (lon - b[0]) / (b[2] - b[0]) * (W - 2 * pad),
+      pad + (b[3] - lat) / (b[3] - b[1]) * (H - 2 * pad),
+    ];
+  }
+  function view(lon, lat) {
+    const p = base(lon, lat);
+    return [
+      (p[0] - W / 2) * state.zoom + W / 2 + state.panX,
+      (p[1] - H / 2) * state.zoom + H / 2 + state.panY,
+    ];
+  }
+  function unview(x, y) {
+    const bx = (x - W / 2 - state.panX) / state.zoom + W / 2;
+    const by = (y - H / 2 - state.panY) / state.zoom + H / 2;
+    return [bx, by];
+  }
+
+  function ramp(t) {
+    const stops = [
+      [0.00, [42, 120, 214]],
+      [0.35, [27, 175, 122]],
+      [0.68, [237, 161, 0]],
+      [1.00, [227, 73, 72]],
+    ];
+    t = Math.max(0, Math.min(1, t));
+    for (let i = 1; i < stops.length; i++) {
+      if (t <= stops[i][0]) {
+        const a = stops[i - 1], c = stops[i];
+        const u = (t - a[0]) / (c[0] - a[0]);
+        return "rgb(" + a[1].map((v, k) => Math.round(v + (c[1][k] - v) * u)).join(",") + ")";
+      }
+    }
+    return "rgb(227,73,72)";
+  }
+  let colorScale = { lo: 0.05, hi: 5 };
+  function computeScale(method) {
+    const vals = FITTED.map(z => rssz(z, method)).filter(Boolean).map(m => m.total).sort((a, b) => a - b);
+    if (!vals.length) return { lo: 0.05, hi: 5 };
+    const q = p => vals[Math.max(0, Math.min(vals.length - 1, Math.floor(p * (vals.length - 1))))];
+    const lo = Math.max(0.02, q(0.05));
+    const hi = Math.max(lo * 1.5, q(0.95));
+    return { lo, hi };
+  }
+  function color(v) {
+    if (v === null || v === undefined || Number.isNaN(v)) return "#d9dde8";
+    const lo = Math.log10(colorScale.lo), hi = Math.log10(colorScale.hi);
+    return ramp((Math.log10(Math.max(v, colorScale.lo)) - lo) / (hi - lo));
+  }
+  function updateLegend() {
+    const el = document.getElementById("legend-ticks");
+    if (!el) return;
+    const lo = Math.log10(colorScale.lo), hi = Math.log10(colorScale.hi);
+    const n = 5, out = [];
+    for (let i = 0; i < n; i++) {
+      const v = Math.pow(10, lo + (hi - lo) * i / (n - 1));
+      out.push("<span>" + (v >= 1 ? v.toFixed(1) : v.toFixed(2)) + "</span>");
+    }
+    el.innerHTML = out.join("");
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const method = state.method;
+    for (const z of Z.zones) {
+      const m = rssz(z.code, method);
+      const fill = z.special ? "#d9dde8" : color(m ? m.total : null);
+      ctx.beginPath();
+      for (const ring of z.rings) {
+        for (let i = 0; i < ring.length; i++) {
+          const p = view(ring[i][0], ring[i][1]);
+          if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
+        }
+        ctx.closePath();
+      }
+      ctx.fillStyle = fill;
+      ctx.fill("evenodd");
+      ctx.lineWidth = z.code === state.zone ? 2.0 : 0.45;
+      ctx.strokeStyle = z.code === state.zone ? "#171B2C" : "rgba(255,255,255,0.55)";
+      ctx.stroke();
+    }
+  }
+
+  function hit(x, y) {
+    // topmost zone wins; iterate reversed for stable selection
+    for (let zi = Z.zones.length - 1; zi >= 0; zi--) {
+      const z = Z.zones[zi];
+      for (const ring of z.rings) {
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          const pi = view(ring[i][0], ring[i][1]);
+          const pj = view(ring[j][0], ring[j][1]);
+          if (((pi[1] > y) !== (pj[1] > y)) &&
+              (x < (pj[0] - pi[0]) * (y - pi[1]) / (pj[1] - pi[1]) + pi[0])) {
+            inside = !inside;
+          }
+        }
+        if (inside) return z;
+      }
+    }
+    return null;
+  }
+
+  function showTip(z, x, y) {
+    if (!z) { tooltip.style.display = "none"; return; }
+    const m = rssz(z.code, state.method);
+    const rank = z.special ? null : rankOf(z.code, state.method);
+    tooltip.innerHTML =
+      "<b>" + (z.name || z.code) + "</b><br>" +
+      "<span style='opacity:.75;font-family:var(--font-mono)'>" + z.code + "</span><br>" +
+      (z.special
+        ? "<span style='color:#ffd7a8'>Special zone — excluded from cohort</span>"
+        : "RSSZ <b>" + fmt(m ? m.total : null) + "</b>" +
+          (rank ? " · rank " + rank + " / " + FITTED.length : ""));
+    tooltip.style.display = "block";
+    const r = canvas.getBoundingClientRect();
+    tooltip.style.left = Math.min(x + 14, W - 230) + "px";
+    tooltip.style.top = Math.min(y + 14, H - 80) + "px";
+  }
+
+  canvas.addEventListener("mousemove", (e) => {
+    const r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    if (dragging) {
+      const dx = x - lastX, dy = y - lastY;
+      if (Math.abs(dx) + Math.abs(dy) > 2) dragMoved = true;
+      state.panX += dx; state.panY += dy;
+      lastX = x; lastY = y;
+      draw();
+      return;
+    }
+    const z = hit(x, y);
+    if (z !== hoverZone) { hoverZone = z; }
+    showTip(z, x, y);
+  });
+  canvas.addEventListener("mouseleave", () => { tooltip.style.display = "none"; hoverZone = null; });
+  canvas.addEventListener("mousedown", (e) => {
+    const r = canvas.getBoundingClientRect();
+    dragging = true; dragMoved = false;
+    lastX = e.clientX - r.left; lastY = e.clientY - r.top;
+    canvas.classList.add("dragging");
+  });
+  window.addEventListener("mouseup", (e) => {
+    if (!dragging) return;
+    dragging = false;
+    canvas.classList.remove("dragging");
+    if (dragMoved) return;
+    const r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const z = hit(x, y);
+    if (z) selectZone(z.code);
+  });
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const wx = (mx - W / 2 - state.panX) / state.zoom + W / 2;
+    const wy = (my - H / 2 - state.panY) / state.zoom + H / 2;
+    const nz = Math.max(1, Math.min(8, state.zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+    state.zoom = nz;
+    state.panX = mx - (wx - W / 2) * nz - W / 2;
+    state.panY = my - (wy - H / 2) * nz - H / 2;
+    draw();
+  }, { passive: false });
+
+  document.getElementById("reset").addEventListener("click", () => {
+    state.zoom = 1; state.panX = 0; state.panY = 0; draw();
+  });
+
+  // -------------------------------------------------------------- details
+  function selectZone(code) {
+    state.zone = code;
+    const z = ZONE[code];
+    if (!z) return;
+    const zsel = document.getElementById("zone");
+    if (zsel) zsel.value = code;
+    state.table = dominantTable(code, state.method);
+    renderDetail();
+    draw();
+  }
+
+  function renderDetail() {
+    const code = state.zone;
+    const z = ZONE[code];
+    if (!z) return;
+    const m = rssz(code, state.method);
+    const method = METHOD[state.method];
+    const rank = z.special ? null : rankOf(code, state.method);
+    const dom = dominantTable(code, state.method);
+
+    document.getElementById("zone-head").innerHTML =
+      "<div><h2>" + (z.name || code) +
+      (z.special ? "<span class='badge special'>special zone</span>" : "") +
+      "</h2><div class='code'>SA2 " + code + (rank ? " · rank " + rank + " / " + FITTED.length : "") + "</div></div>" +
+      "<div class='zone-rssz'><div class='v'>" + fmt(m ? m.total : null) + "</div><div class='l'>RSSZ · 19 tables</div></div>";
+
+    const cards = [
+      ["Median 19", fmt(method.median19), "cohort"],
+      ["Mean 19", fmt(method.mean19), "cohort"],
+      ["Median 11", fmt(method.median11), "shared basis"],
+      ["Mean 11", fmt(method.mean11), "shared basis"],
+      ["Held-out", fmt(method.heldout), "mean RSSZ, 7 tables"],
+      ["Joint TVD", fmt(method.joint), "367-zone audit"],
+      ["Identical", method.identical === null || method.identical === undefined ? "—" : method.identical + "%", "within zone"],
+      ["Median zones/tuple", fmt(method.median_zones, 1), "tuple spread"],
+      ["Single-zone", method.single_zone === null || method.single_zone === undefined ? "—" : method.single_zone + "%", "zone-specific persons"],
+    ];
+    document.getElementById("method-cards").innerHTML = cards.map(c =>
+      "<div class='card'><div class='k'>" + c[0] + "</div><div class='v'>" + c[1] + "</div><div class='s'>" + c[2] + "</div></div>"
+    ).join("");
+
+    document.getElementById("method-line").innerHTML =
+      "<span><b>Pool:</b> " + method.pool + "</span>" +
+      "<span><b>Fitting method:</b> " + method.fitting + "</span>" +
+      "<span>" + method.settings + "</span>";
+
+    const tables = Object.entries(m ? m.tables : {}).sort((a, b) => b[1] - a[1]);
+    const max = Math.max(0.05, ...tables.map(t => t[1]));
+    document.getElementById("table-bars").innerHTML = tables.map(([t, v]) => {
+      const w = Math.max(2, 100 * (Math.log10(Math.max(v, 0.02)) - Math.log10(0.02)) /
+        (Math.log10(Math.max(max, 0.05)) - Math.log10(0.02)));
+      return "<div class='bar-row" + (t === state.table ? " active" : "") + "' data-table='" + t + "'>" +
+        "<div class='name'>" + TABLE_LABEL[t] + "</div>" +
+        "<div class='track'><div class='fill' style='width:" + Math.min(100, w) + "%'></div></div>" +
+        "<div class='val'>" + fmt(v) + "</div></div>";
+    }).join("");
+    document.querySelectorAll(".bar-row").forEach(el => {
+      el.addEventListener("click", () => { state.table = el.dataset.table; renderDetail(); });
+    });
+
+    // table selector
+    const sel = document.getElementById("table");
+    if (!sel.options.length) {
+      sel.innerHTML = TABLES.map(t => "<option value='" + t.id + "'>" + t.label + "</option>").join("");
+    }
+    sel.value = state.table;
+
+    renderMarginal();
+    renderProgression();
+  }
+
+  function renderProgression() {
+    const P = window.DASH_PROGRESSION;
+    const z = P && P.zones[state.zone];
+    const el = document.getElementById("prog-table");
+    const title = document.getElementById("prog-title");
+    if (!el || !title) return;
+    title.textContent = "SA2 " + state.zone + " — field of study (qalfp)";
+    if (!z) {
+      el.innerHTML = "<tbody><tr><td class='lab'>No progression data for this zone.</td></tr></tbody>";
+      return;
+    }
+    let html = "<thead><tr><th>Category</th><th>Target</th><th>Raw</th><th>CP</th><th>MIP</th><th>Fitted</th></tr></thead><tbody>";
+    for (let i = 0; i < P.categories.length; i++) {
+      const t = z.target[i] || 0, r = z.raw[i] || 0, c = z.cp[i] || 0,
+            m = z.mip[i] || 0, f = z.fitted[i] || 0;
+      const raw0 = r === 0 && t > 0;
+      const fit0 = f === 0 && t > 0;
+      html += "<tr><td class='lab'>" + P.labels[i] +
+        (raw0 ? " <span style='color:var(--bad);font-weight:700'>·</span>" : "") + "</td>" +
+        "<td>" + t.toFixed(2) + "</td>" +
+        "<td class='" + (raw0 ? "diff-pos" : "") + "'>" + r.toFixed(2) + "</td>" +
+        "<td>" + c.toFixed(2) + "</td>" +
+        "<td>" + m.toFixed(2) + "</td>" +
+        "<td class='" + (fit0 ? "diff-pos" : "") + "'>" + f.toFixed(2) + "</td></tr>";
+    }
+    html += "</tbody>";
+    el.innerHTML = html;
+  }
+
+  function renderMarginal() {
+    const table = state.table;
+    const data = R.marginals[table];
+    const method = METHOD[state.method];
+    document.getElementById("marg-title").textContent =
+      TABLE_LABEL[table] + " — " + method.label;
+    const el = document.getElementById("marg-table");
+    if (!data || !data.methods[state.method]) {
+      el.innerHTML = "<tr><td class='lab'>No marginal data for this arm.</td></tr>";
+      return;
+    }
+    const syn = data.methods[state.method];
+    const maxShare = Math.max(0.001, ...data.census, ...syn);
+    let html = "<thead><tr><th>Category</th><th>Observed</th><th>Synthesized</th><th>Δ (pp)</th><th></th></tr></thead><tbody>";
+    for (let i = 0; i < data.categories.length; i++) {
+      const c = data.categories[i];
+      const o = data.census[i] || 0, s = syn[i] || 0;
+      const diff = 100 * (s - o);
+      const cls = diff > 0 ? "diff-pos" : (diff < 0 ? "diff-neg" : "");
+      const ow = Math.max(1, 46 * o / maxShare), sw = Math.max(1, 46 * s / maxShare);
+      html += "<tr><td class='lab'>" + catLabel(table, c) + "</td>" +
+        "<td>" + pct(o) + "</td><td>" + pct(s) + "</td>" +
+        "<td class='" + cls + "'>" + (diff >= 0 ? "+" : "") + diff.toFixed(1) + "</td>" +
+        "<td><span class='mini'><i class='obs' style='width:" + ow + "px'></i><i class='syn' style='width:" + sw + "px'></i></span></td></tr>";
+    }
+    html += "</tbody>";
+    el.innerHTML = html;
+  }
+
+  // ----------------------------------------------------------- comparison
+  function renderComparison() {
+    const cols = ["Method", "Pool", "Fitting method", "Median 19", "Mean 19", "Median 11", "Mean 11", "Held-out", "Joint TVD", "Identical", "Median zones/tuple", "Single-zone"];
+    let html = "<thead><tr>" + cols.map(c => "<th>" + c + "</th>").join("") + "</tr></thead><tbody>";
+    for (const m of METHODS) {
+      html += "<tr data-method='" + m.id + "' class='" + (m.id === state.method ? "active" : "") + "'>" +
+        "<td><b>" + m.label + "</b></td><td>" + m.pool + "</td><td>" + m.fitting + "</td>" +
+        "<td>" + fmt(m.median19) + "</td><td>" + fmt(m.mean19) + "</td>" +
+        "<td>" + fmt(m.median11) + "</td><td>" + fmt(m.mean11) + "</td>" +
+        "<td>" + fmt(m.heldout) + "</td><td>" + fmt(m.joint) + "</td>" +
+        "<td>" + (m.identical === null || m.identical === undefined ? "—" : m.identical + "%") + "</td>" +
+        "<td>" + fmt(m.median_zones, 1) + "</td>" +
+        "<td>" + (m.single_zone === null || m.single_zone === undefined ? "—" : m.single_zone + "%") + "</td></tr>";
+    }
+    html += "</tbody>";
+    document.getElementById("compare-table").innerHTML = html;
+    document.querySelectorAll("#compare-table tbody tr").forEach(tr => {
+      tr.addEventListener("click", () => selectMethod(tr.dataset.method));
+    });
+  }
+
+  function renderMethods() {
+    document.getElementById("method-grid").innerHTML = METHODS.map(m =>
+      "<div class='method-card" + (m.id === state.method ? " active" : "") + "' data-method='" + m.id + "'>" +
+      "<h4>" + m.label + "</h4>" +
+      "<div class='meta'>" + m.pool + " · " + m.fitting + "</div>" +
+      "<p>" + m.desc + "</p></div>"
+    ).join("");
+    document.querySelectorAll(".method-card").forEach(el => {
+      el.addEventListener("click", () => selectMethod(el.dataset.method));
+    });
+  }
+
+  function selectMethod(id) {
+    state.method = id;
+    colorScale = computeScale(id);
+    updateLegend();
+    document.getElementById("method").value = id;
+    renderDetail();
+    renderComparison();
+    renderMethods();
+    draw();
+  }
+
+  // --------------------------------------------------------------- start
+  document.getElementById("method").innerHTML =
+    METHODS.map(m => "<option value='" + m.id + "'>" + m.label + "</option>").join("");
+  document.getElementById("method").value = state.method;
+  document.getElementById("method").addEventListener("change", (e) => selectMethod(e.target.value));
+  document.getElementById("table").addEventListener("change", (e) => {
+    state.table = e.target.value;
+    renderDetail();
+  });
+
+  state.zone = ZONE["303031061"] ? "303031061" : FITTED[0];
+  state.table = dominantTable(state.zone, state.method);
+  const zsel = document.getElementById("zone");
+  zsel.innerHTML = Z.zones.slice()
+    .sort((a, b) => (a.name || a.code).localeCompare(b.name || b.code))
+    .map(z => "<option value='" + z.code + "'>" + (z.name || z.code) + " (" + z.code + ")" + (z.special ? " — special" : "") + "</option>")
+    .join("");
+  zsel.value = state.zone;
+  zsel.addEventListener("change", (e) => selectZone(e.target.value));
+  colorScale = computeScale(state.method);
+  updateLegend();
+  renderComparison();
+  renderMethods();
+  renderDetail();
+  resize();
+  window.addEventListener("resize", resize);
+})();
+</script>
+</body>
+</html>
