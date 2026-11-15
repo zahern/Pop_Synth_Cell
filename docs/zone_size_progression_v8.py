@@ -150,9 +150,10 @@ def main() -> None:
 
     g = (d.groupby(["quintile", "table"])[["raw", "cp", "mip"]].mean()
          .reset_index())
-    # mean over the 19 tables, and the person/household split
-    tab_mean = d.groupby("quintile")[["raw", "cp", "mip"]].mean()
-    print("\nmean TVD over 19 tables by quintile")
+    # mean over the 17 tables without the known code-domain mismatches
+    d_plot = d[~d.table.isin(["nprd", "strd"])]
+    tab_mean = d_plot.groupby("quintile")[["raw", "cp", "mip"]].mean()
+    print("\nmean TVD over 17 tables by quintile (nprd, strd excluded)")
     print(tab_mean.round(4).to_string())
 
     colours = {"raw": "#9E9E9E", "cp": "#4FB3A0", "mip": "#7B5EA7"}
@@ -163,7 +164,7 @@ def main() -> None:
                 label=labels[key], linewidth=1.6, markersize=5)
     ax.set_xticks([1, 2, 3, 4, 5])
     ax.set_xticklabels(["Q1\nsmallest", "Q2", "Q3", "Q4", "Q5\nlargest"])
-    ax.set_ylabel("Mean TVD to the census marginal (19 tables)")
+    ax.set_ylabel("Mean TVD to the census marginal (17 tables)")
     ax.set_xlabel("Zone population quintile")
     ax.grid(axis="y", color="#DDDDDD", linewidth=0.5)
     ax.set_axisbelow(True)
@@ -187,20 +188,21 @@ def main() -> None:
     print("\nrepresentative zones")
     print(reps[["zone", "person_target", "quintile"]].to_string(index=False))
 
-    # qalfp and nprd progression for the representatives
-    panel_tables = [("qalfp", "Field of study"), ("nprd", "Household size")]
+    # qalfp and heap progression for the representatives
+    panel_tables = [("qalfp", "Field of study"), ("heap", "Highest education")]
     short = {
         "qalfp": {1: "Nat. sci.", 2: "IT", 3: "Eng.", 4: "Arch.",
                   5: "Agri.", 6: "Health", 7: "Educ.", 8: "Mgmt",
                   9: "Society", 10: "Creative", 11: "Food/hosp.",
                   12: "Mixed", 13: "Inad. desc.", 14: "Not stated",
                   15: "N/A", 16: "Overseas"},
-        "nprd": {1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6",
-                 7: "N/A"},
+        "heap": {1: "Postgrad", 2: "Grad dip", 3: "Bachelor", 4: "Adv dip",
+                 5: "Cert I/II", 6: "Yr 10+", 7: "Cert III/IV", 8: "Yr 9-",
+                 9: "Suppl.", 10: "Not stated", 11: "N/A", 12: "Overseas"},
     }
-    fig, axes = plt.subplots(len(reps), 2, figsize=(10.6, 2.1 * len(reps)),
+    colours = {"Raw": "#4D4D4D", "CP": "#00796B", "MIP": "#5E35B1"}
+    fig, axes = plt.subplots(len(reps), 2, figsize=(10.6, 2.25 * len(reps)),
                              squeeze=False)
-    floor = 0.01
     for i, (_, r) in enumerate(reps.iterrows()):
         zone, sa4 = r.zone, zone_sa4.get(r.zone)
         for j, (table, title) in enumerate(panel_tables):
@@ -213,22 +215,21 @@ def main() -> None:
             }
             codes = sorted(t)
             y = np.arange(len(codes))
-            tv = np.array([max(100 * t.get(c, 0.0), floor) for c in codes])
-            ax.scatter(tv, y, marker="|", s=140, color="#111111",
-                       linewidths=1.4, label="Census target", zorder=5)
+            ax.axvspan(-0.2, 0.2, color="#EEEEEE", zorder=0, linewidth=0)
+            ax.axvline(0, color="#333333", linewidth=0.8, zorder=2)
             for name, s in series.items():
-                sv = np.array([max(100 * s.get(c, 0.0), floor)
-                               for c in codes])
-                ax.scatter(sv, y, s=18, color=colours[name.lower()],
-                           label=name, edgecolor="white", linewidth=0.3,
-                           zorder=4)
+                diff = np.array([100 * (s.get(c, 0.0) - t.get(c, 0.0))
+                                 for c in codes])
+                ax.scatter(diff, y, s=22, color=colours[name], label=name,
+                           edgecolor="white", linewidth=0.4, zorder=4)
             ax.set_yticks(y)
             ax.set_yticklabels([short[table].get(c, str(c)) for c in codes],
                                fontsize=5.5)
-            ax.set_xscale("log")
-            ax.set_xlim(0.008, 120)
-            ax.set_xticks([0.01, 0.1, 1, 10, 100])
-            ax.set_xticklabels(["0.01", "0.1", "1", "10", "100"], fontsize=6)
+            ax.set_xscale("symlog", linthresh=0.1)
+            ax.set_xlim(-60, 60)
+            ax.set_xticks([-50, -10, -1, -0.1, 0, 0.1, 1, 10, 50])
+            ax.set_xticklabels(["-50", "-10", "-1", "-0.1", "0", "0.1",
+                                "1", "10", "50"], fontsize=6)
             ax.grid(axis="x", color="#EEEEEE", linewidth=0.4)
             ax.set_axisbelow(True)
             ax.spines["top"].set_visible(False)
@@ -240,11 +241,14 @@ def main() -> None:
                 ax.set_ylabel(f"Q{int(r.quintile)} · {int(r.person_target):,}\n"
                               f"{zone}", fontsize=6.5)
     handles, labels_ = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels_, loc="upper center", ncol=4, frameon=False,
+    fig.legend(handles, labels_, loc="upper center", ncol=3, frameon=False,
                fontsize=8, bbox_to_anchor=(0.5, 0.995))
     fig.suptitle("Pool progression for representative zones across the size "
-                 "distribution", fontsize=10, y=0.965)
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+                 "distribution: each stage minus the census marginal",
+                 fontsize=10, y=0.965)
+    fig.supxlabel("Share minus census marginal (percentage points; symmetric "
+                  "log scale; grey band is $\\pm$0.2 pp)", fontsize=8, y=0.012)
+    fig.tight_layout(rect=(0, 0.02, 1, 0.95))
     path = os.path.join(OUT, "fig_pool_progression_by_size.png")
     fig.savefig(path, dpi=190, bbox_inches="tight")
     plt.close(fig)

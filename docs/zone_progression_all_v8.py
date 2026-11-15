@@ -1,14 +1,17 @@
-"""Marginal progression for SA2 112011236 across six control tables.
+"""Marginal progression for SA2 112011236 across four control tables.
 
-For each table, compare the zone target with the raw SA4 slice, the CP pool,
-the expanded pool and the CP-MIP+fallback fitted population.  Writes a tidy CSV
-and a six-panel difference plot (share minus target, percentage points).
+Each panel shows the raw SA4 slice, the CP pool and the expanded pool as a
+difference from the census marginal (percentage points).  The symmetric-log
+axis keeps both sub-point and double-digit gaps visible.  Tables with a known
+code-domain mismatch (nprd, strd) are deliberately excluded here; the v9 run
+fixes strd and the nprd leak is reported separately.
 
 Run locally over the Z: share.
 """
 from __future__ import annotations
 
 import os
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
@@ -32,8 +35,6 @@ TABLES = [
     ("rlhp", "Relationship in household", False),
     ("stup", "Student status", False),
     ("heap", "Highest education", False),
-    ("nprd", "Household size", True),
-    ("strd", "Dwelling structure", True),
 ]
 
 LABELS = {
@@ -51,13 +52,8 @@ LABELS = {
     "heap": {1: "Postgrad", 2: "Grad dip", 3: "Bachelor", 4: "Adv dip",
              5: "Cert I/II", 6: "Yr 10+", 7: "Cert III/IV", 8: "Yr 9-",
              9: "Suppl.", 10: "Not stated", 11: "N/A", 12: "Overseas"},
-    "nprd": {1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "N/A"},
-    "strd": {1: "Separate", 2: "Semi-det.", 3: "Flat/unit",
-             4: "Not stated", 5: "N/A", 9: "Caravan/other"},
 }
 
-# control label -> code, from the pipeline's own mapping
-import sys
 sys.path.insert(0, r"Z:\Paper_Plan\synth_pop")
 from CensusRecordImporter import CensusControlTable  # noqa: E402
 
@@ -84,11 +80,10 @@ def control_target(table: str) -> dict[int, float]:
 
 
 def pool_shares(df: pd.DataFrame, table: str, household: bool) -> dict[int, float]:
-    col = table
     if household:
-        s = df.groupby("abshid")[col].first()
+        s = df.groupby("abshid")[table].first()
     else:
-        s = df[col]
+        s = df[table]
     return shares_from_codes(s)
 
 
@@ -136,45 +131,39 @@ def main() -> None:
     out = pd.DataFrame(rows)
     out.to_csv(os.path.join(OUT, "zone_progression_all_v8.csv"), index=False)
 
-    colours = {"Raw": "#9E9E9E", "CP": "#4FB3A0", "MIP": "#7B5EA7"}
-    fig, axes = plt.subplots(3, 2, figsize=(12.4, 9.8))
-    floor = 0.01
+    colours = {"Raw": "#4D4D4D", "CP": "#00796B", "MIP": "#5E35B1"}
+    fig, axes = plt.subplots(2, 2, figsize=(11.6, 8.4))
+    linthresh = 0.1
     for ax, (table, title, codes, tgt, series) in zip(axes.ravel(), panels):
         y = np.arange(len(codes))
-        tv = np.array([max(100 * tgt.get(c, 0.0), floor) for c in codes])
-        ax.scatter(tv, y, marker="|", s=170, color="#111111",
-                   linewidths=1.6, label="Census target", zorder=5)
+        ax.axvspan(-0.2, 0.2, color="#EEEEEE", zorder=0, linewidth=0)
+        ax.axvline(0, color="#333333", linewidth=0.9, zorder=2)
         for name, s in series.items():
-            sv = np.array([max(100 * s.get(c, 0.0), floor) for c in codes])
-            ax.scatter(sv, y, s=24, color=colours[name], label=name,
-                       edgecolor="white", linewidth=0.4, zorder=4)
-        # guide from target to the expanded pool
-        mv = np.array([max(100 * series["MIP"].get(c, 0.0), floor)
-                       for c in codes])
-        for yi, a, b in zip(y, tv, mv):
-            ax.plot([a, b], [yi, yi], color="#CCCCCC", linewidth=0.8,
-                    zorder=1)
+            diff = np.array([100 * (s.get(c, 0.0) - tgt.get(c, 0.0))
+                             for c in codes])
+            ax.scatter(diff, y, s=34, color=colours[name], label=name,
+                       edgecolor="white", linewidth=0.5, zorder=4)
         ax.set_yticks(y)
         ax.set_yticklabels([LABELS[table][c] for c in codes], fontsize=7)
         ax.set_title(f"{table}: {title}", fontsize=9, fontweight="bold")
-        ax.set_xscale("log")
-        ax.set_xlim(0.008, 120)
-        ax.set_xticks([0.01, 0.1, 1, 10, 100])
-        ax.set_xticklabels(["0.01", "0.1", "1", "10", "100"], fontsize=7)
+        ax.set_xscale("symlog", linthresh=linthresh)
+        ax.set_xlim(-60, 60)
+        ax.set_xticks([-50, -10, -1, -0.1, 0, 0.1, 1, 10, 50])
+        ax.set_xticklabels(["-50", "-10", "-1", "-0.1", "0", "0.1",
+                            "1", "10", "50"], fontsize=7)
         ax.grid(axis="x", color="#DDDDDD", linewidth=0.5)
         ax.set_axisbelow(True)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.set_ylim(-0.6, len(codes) - 0.4)
-    for ax in axes[:, 0]:
-        ax.set_ylabel("")
     handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=4, frameon=False,
+    fig.legend(handles, labels, loc="upper center", ncol=3, frameon=False,
                fontsize=9, bbox_to_anchor=(0.5, 0.985))
-    fig.suptitle(f"Marginal progression, SA2 {ZONE}: pool stages against the "
+    fig.suptitle(f"Marginal progression, SA2 {ZONE}: each pool stage minus the "
                  f"census marginal", fontsize=11, y=0.945)
-    fig.supxlabel("Share (%, log scale; values below 0.01% sit at the axis "
-                  "floor)", fontsize=8.5, y=0.035)
+    fig.supxlabel("Share minus census marginal (percentage points; symmetric "
+                  "log scale; grey band is $\\pm$0.2 pp)", fontsize=8.5,
+                  y=0.035)
     fig.tight_layout(rect=(0, 0.04, 1, 0.93))
     path = os.path.join(OUT, "fig_zone_progression_all.png")
     fig.savefig(path, dpi=190, bbox_inches="tight")

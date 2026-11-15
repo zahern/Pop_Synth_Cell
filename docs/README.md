@@ -42,7 +42,7 @@ observed and synthesized marginal shares.
   table, with the best arm starred in each column.
 - `fig_pool_tvd_by_size.png` - pool-target marginal distance by zone population
   quintile, before fitting.
-- `fig_pool_progression_by_size.png` - field-of-study and household-size
+- `fig_pool_progression_by_size.png` - field-of-study and highest-education
   progression for five zones spanning the size distribution.
 
 ## Data and caveats
