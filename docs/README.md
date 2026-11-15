@@ -36,12 +36,14 @@ observed and synthesized marginal shares.
 
 - `fig_rssz_by_arm.png` - per-zone RSSZ boxplots, split by pool coverage, with
   the fitting method on each row.
-- `fig_zone_progression_all.png` - six-table marginal progression for SA2
-  112011236: census target against the raw SA4 slice, CP pool and expanded pool.
+- `fig_zone_progression_all.png` - four-table marginal progression for SA2
+  112011236: each pool stage against the census marginal.
 - `fig_method_table_heatmap.png` - mean per-zone RSSZ by method and control
   table, with the best arm starred in each column.
 - `fig_pool_tvd_by_size.png` - pool-target marginal distance by zone population
   quintile, before fitting.
+- `fig_pool_score_summary.png` - marginal distance, zero-cell coverage and their
+  equal-weight composite for each pool stage.
 - `fig_pool_progression_by_size.png` - field-of-study and highest-education
   progression for five zones spanning the size distribution.
 
