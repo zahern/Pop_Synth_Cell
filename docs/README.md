@@ -12,14 +12,14 @@ observed and synthesized marginal shares.
 
 ## What is in it
 
-- **Map**: 371 SA2 polygons (362 fitted zones + 5 special zones in gray),
-  coloured by per-zone 19-table RSSZ for the selected method. Hover for the zone
+- **Map**: 371 SA2 polygons (362 fitted zones + 9 outside the cohort in gray),
+  coloured by per-zone 19-table RSSZ for the selected configuration. Hover for the zone
   name, code, RSSZ and rank; click to select; scroll to zoom; drag to pan. The
   **Random zone** button picks a fitted zone at random.
-- **Method selector**: the arms with a v8 fit. SA-Only and IPU-Only appear once
-  their baseline jobs finish.
+- **Method selector**: the four configurations of the paper: CP-only, CP-MIP
+  without fallback, CP-MIP with fallback, and the unique fallback mode.
 - **Zone detail**: per-zone RSSZ, rank, per-table RSSZ bars (19 tables), and the
-  method's median/mean RSSZ (19- and 11-table bases), held-out mean RSSZ, joint
+  method's median/mean RSSZ, held-out mean RSSZ, joint
   TVD, identical-person share and single-zone share.
 - **Observed vs synthesized**: for the selected table, the cohort-level
   observed and synthesized category shares and their difference in percentage
@@ -28,9 +28,9 @@ observed and synthesized marginal shares.
   `qalfp` table's target, raw SA4 microdata, CP pool, MIP pool and fitted
   CP-MIP+fallback percentages. This is the same progression as the paper's zone
   table for SA2 112011236.
-- **Method comparison**: the full arm table; click a row to switch the map.
-- **Method descriptions**: each arm's pool and fitting method, with the two MIP
-  roles (expansion MIP vs fitting MIP) stated explicitly.
+- **Method comparison**: the full configuration table; click a row to switch the map.
+- **Method descriptions**: each configuration's pool and fitting method, with the
+  CP construction, expansion MIP, fallback block and fitting MIP stated explicitly.
 
 ## Static figures
 
@@ -51,10 +51,10 @@ observed and synthesized marginal shares.
 
 ## Data and caveats
 
-- Fitted cohort: **362 zones**. The five special zones are shown in gray and
-  excluded from cohort means. The four no-target zones are omitted.
-- Fitting basis: **19 in-sample control tables**; the 11 shared tables are shown
-  in the method comparison.
+- Fitted cohort: **362 zones**. Nine zones outside it (four with no usable target
+  and five non-residential/POE-special) are shown in gray and excluded from cohort
+  means.
+- Fitting basis: **19 in-sample control tables**.
 - Held-out: **7 control tables**, mean RSSZ per arm.
 - Marginal shares are **cohort-level** across the 362 fitted zones. The map and
   per-table bars are the per-zone fit.

@@ -279,7 +279,7 @@
       <div class="marginal-head">
         <div>
           <div style="font-weight:600;font-size:12px;" id="prog-title">—</div>
-          <div class="sub">Target · raw SA4 microdata · CP pool · MIP pool · fitted MIP+SA</div>
+          <div class="sub">Target · raw SA4 microdata · CP pool · MIP pool · fitted CP–MIP</div>
         </div>
       </div>
       <div class="marg-table-wrap" style="margin-top:7px;max-height:280px;">
@@ -293,7 +293,7 @@
     <div class="head">
       <div>
         <h2>Method comparison</h2>
-        <p>Median and mean per-zone RSSZ on the 19-table and 11-table bases; joint and diversity audit on the 367-zone audit cohort (362 fitted plus five special zones). Median zones/tuple and single-zone persons are tuple-spread descriptors, not record-copying measures. Click a row to switch the map.</p>
+        <p>Median and mean per-zone RSSZ on the 19-table basis; joint and diversity audit on the 367-zone audit cohort (362 fitted plus five special zones). Median zones/tuple and single-zone persons are tuple-spread descriptors, not record-copying measures. Click a row to switch the map.</p>
       </div>
     </div>
     <div class="table-scroll">
@@ -303,17 +303,17 @@
 
   <section class="panel methods">
     <h2>What each method is</h2>
-    <p class="intro">The MIP appears twice. The <b>expansion MIP</b> builds the expanded pool; the <b>fitting MIP</b> is a separate per-zone integer program. Arm names read pool first, fitting method second. CP-MIP is the CP pool fitted by the MIP; MIP+SA and MIP+IPU are conventional fitters on the expanded pool; MIP (direct) is CP construction → MIP expansion → MIP fit.</p>
+    <p class="intro">The method has three blocks. <b>CP construction</b> builds a rule-feasible candidate pool; the <b>expansion MIP</b> adds donor--shell households for zero-capacity cells the pool can source; the <b>fallback block</b> constructs carriers for cells that no census donor carries. The <b>fitting MIP</b> then selects households from the resulting pool. The four configurations are block ablations: CP-only, CP--MIP without fallback, CP--MIP with fallback (reported), and the unique fallback mode.</p>
     <div class="method-grid" id="method-grid"></div>
   </section>
 
   <div class="footer">
-    <b>Data.</b> Per-zone RSSZ from <span class="kbd">zone_table_rssz.csv</span>; cohort marginal shares from <span class="kbd">marginal_category_shares.csv</span>; held-out means from <span class="kbd">heldout_rssz_all.csv</span>; boundaries from the ABS SA2 2021 shapefile. The fitted cohort is 362 zones; the five special zones are shown in gray and excluded from cohort means. The four no-target zones are omitted. The joint/diversity audit is on 367 zones (362 fitted plus five special); median zones/tuple and single-zone persons are descriptive spread measures, not record-copying measures. Marginal shares are cohort-level, not per zone.
+    <b>Data.</b> Per-zone RSSZ from <span class="kbd">zone_table_rssz.csv</span>; cohort marginal shares from <span class="kbd">marginal_category_shares.csv</span>; held-out means from <span class="kbd">heldout_rssz_all.csv</span>; boundaries from the ABS SA2 2021 shapefile. The fitted cohort is 362 zones; nine zones outside it (four with no usable target and five non-residential/POE-special) are shown in gray and excluded from cohort means. The joint/diversity audit is on 367 zones (362 fitted plus the five special zones); median zones/tuple and single-zone persons are descriptive spread measures, not record-copying measures. Marginal shares are cohort-level, not per zone.
   </div>
 </div>
 
-<script src="data/zones.js?v=2"></script>
-<script src="data/results.js?v=2"></script>
+<script src="data/zones.js?v=3"></script>
+<script src="data/results.js?v=3"></script>
 <script src="data/progression_qalfp.js?v=4"></script>
 <script>
 (function () {
@@ -329,7 +329,7 @@
   const FITTED = Z.zones.filter(z => !z.special).map(z => z.code);
 
   const state = {
-    method: "cp_mip_expansion_sa",
+    method: "cp_mip_fallback",
     zone: null,
     table: "nprd",
     zoom: 1, panX: 0, panY: 0,
@@ -602,8 +602,6 @@
     const cards = [
       ["Median 19", fmt(method.median19), "cohort"],
       ["Mean 19", fmt(method.mean19), "cohort"],
-      ["Median 11", fmt(method.median11), "shared basis"],
-      ["Mean 11", fmt(method.mean11), "shared basis"],
       ["Held-out", fmt(method.heldout), "mean RSSZ, 7 tables"],
       ["Joint TVD", fmt(method.joint), "367-zone audit"],
       ["Identical", method.identical === null || method.identical === undefined ? "—" : method.identical + "%", "within zone"],
@@ -704,13 +702,12 @@
 
   // ----------------------------------------------------------- comparison
   function renderComparison() {
-    const cols = ["Method", "Pool", "Fitting method", "Median 19", "Mean 19", "Median 11", "Mean 11", "Held-out", "Joint TVD", "Identical", "Median zones/tuple", "Single-zone"];
+    const cols = ["Method", "Pool", "Fitting method", "Median 19", "Mean 19", "Held-out", "Joint TVD", "Identical", "Median zones/tuple", "Single-zone"];
     let html = "<thead><tr>" + cols.map(c => "<th>" + c + "</th>").join("") + "</tr></thead><tbody>";
     for (const m of METHODS) {
       html += "<tr data-method='" + m.id + "' class='" + (m.id === state.method ? "active" : "") + "'>" +
         "<td><b>" + m.label + "</b></td><td>" + m.pool + "</td><td>" + m.fitting + "</td>" +
         "<td>" + fmt(m.median19) + "</td><td>" + fmt(m.mean19) + "</td>" +
-        "<td>" + fmt(m.median11) + "</td><td>" + fmt(m.mean11) + "</td>" +
         "<td>" + fmt(m.heldout) + "</td><td>" + fmt(m.joint) + "</td>" +
         "<td>" + (m.identical === null || m.identical === undefined ? "—" : m.identical + "%") + "</td>" +
         "<td>" + fmt(m.median_zones, 1) + "</td>" +
