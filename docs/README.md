@@ -16,8 +16,8 @@ observed and synthesized marginal shares.
   coloured by per-zone 19-table RSSZ for the selected configuration. Hover for the zone
   name, code, RSSZ and rank; click to select; scroll to zoom; drag to pan. The
   **Random zone** button picks a fitted zone at random.
-- **Method selector**: the four configurations of the paper: CP-only, CP-MIP
-  without fallback, CP-MIP with fallback, and the unique fallback mode.
+- **Method selector**: the five configurations of the paper: CP pool with SA
+  and IPU, and the expanded pool with SA, IPU and MIP.
 - **Zone detail**: per-zone RSSZ, rank, per-table RSSZ bars (19 tables), and the
   method's median/mean RSSZ, held-out mean RSSZ, joint
   TVD, identical-person share and single-zone share.
@@ -40,8 +40,8 @@ observed and synthesized marginal shares.
   112011236: each pool stage against the census marginal.
 - `fig_method_table_heatmap.png` - mean per-zone RSSZ by configuration and
   control table, with the best configuration starred in each column.
-- `fig_table_delta_heatmap.png` - per-table RSSZ change relative to CP-only for
-  the three block ablations.
+- `fig_table_delta_heatmap.png` - per-table RSSZ change relative to the CP pool
+  with SA for the other four configurations.
 - `fig_pool_tvd_by_size.png` - pool-target marginal distance by zone population
   quintile, before fitting.
 - `fig_pool_score_summary.png` - marginal distance, zero-cell coverage and their

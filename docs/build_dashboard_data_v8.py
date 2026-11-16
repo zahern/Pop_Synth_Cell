@@ -18,26 +18,28 @@ RUN = r"Z:/Paper_Plan/runs/2026-11-13_v8"
 OUT = os.path.join(PAPER, "dashboard", "data")
 os.makedirs(OUT, exist_ok=True)
 
-ARMS = ["base_sa", "cp_mip", "cp_mip_fallback", "mip_fallback"]
+ARMS = ["base_sa", "base_ipu", "mip_sa", "mip_ipu", "cp_mip_fallback"]
 
 META = {
-    "base_sa": dict(label="CP-only", pool="CP feasible pool", fitting="SA",
+    "base_sa": dict(label="CP pool, SA", pool="CP feasible pool", fitting="SA",
                     settings="1,000 iterations per zone; Metropolis; best-so-far",
                     desc="CP construction with the conventional SA fit."),
-    "cp_mip": dict(label="CP-MIP, no fallback", pool="CP feasible pool",
-                   fitting="Integer MIP",
-                   settings="REP_MAX 4, lambda_joint 20; replication allowed",
-                   desc="Unified method without the fallback block."),
-    "cp_mip_fallback": dict(label="CP-MIP, fallback",
-                            pool="CP pool + zone-tagged carriers",
+    "base_ipu": dict(label="CP pool, IPU", pool="CP feasible pool", fitting="IPU",
+                     settings="IPU weights on the CP feasible pool",
+                     desc="CP construction with the conventional IPU fit."),
+    "mip_sa": dict(label="Expanded, SA", pool="CP pool + expansion",
+                   fitting="SA",
+                   settings="1,000 iterations per zone; Metropolis; best-so-far",
+                   desc="Expanded pool fitted by SA."),
+    "mip_ipu": dict(label="Expanded, IPU", pool="CP pool + expansion",
+                    fitting="IPU",
+                    settings="IPU weights on the expanded pool",
+                    desc="Expanded pool fitted by IPU."),
+    "cp_mip_fallback": dict(label="Expanded, MIP",
+                            pool="CP pool + expansion",
                             fitting="Integer MIP",
-                            settings="REP_MAX 4, lambda_joint 20; fallback carriers",
-                            desc="Reported method: CP construction, MIP expansion, fallback carriers and the fitting MIP."),
-    "mip_fallback": dict(label="CP-MIP, unique fallback",
-                         pool="Expanded pool + zone-tagged carriers",
-                         fitting="Integer MIP (unique)",
-                         settings="REP_MAX 1 + adult uniqueness; fallback carriers",
-                         desc="Unique fallback mode; the population propagated to the ABM."),
+                            settings="REP_MAX 4, lambda_joint 20; replication allowed",
+                            desc="Reported method: CP construction, MIP expansion and the fitting MIP."),
 }
 
 TABLES = [
@@ -148,16 +150,17 @@ if os.path.exists(audit_path):
                                median_zones=r["tuple_zone_median"],
                                single_zone=100 * r["persons_single_zone_share"])
 
-HELD_KEY = {"base_sa": "CP-only+SA", "cp_mip": "CP-MIP",
-            "cp_mip_fallback": "CP-MIP+fallback",
-            "mip_fallback": "MIP (direct)+fallback"}
-AUDIT_KEY = {"base_sa": "base_sa", "cp_mip": "cp_mip_rep4",
-             "cp_mip_fallback": "cp_mip_fallback",
-             "mip_fallback": "mip_mip_fallback_unique"}
+HELD_KEY = {"base_sa": "CP-only+SA", "base_ipu": "CP-only+IPU",
+            "mip_sa": "MIP+SA", "mip_ipu": "MIP+IPU",
+            "cp_mip_fallback": "CP-MIP+fallback"}
+AUDIT_KEY = {"base_sa": "base_sa", "base_ipu": "base_ipu",
+             "mip_sa": "cp_mip_expansion_sa",
+             "mip_ipu": "cp_mip_expansion_ipu",
+             "cp_mip_fallback": "cp_mip_fallback"}
 
-SUMMARY_KEY = {"base_sa": "cp_sa", "cp_mip": "cp_mip",
-               "cp_mip_fallback": "cp_mip_fallback",
-               "mip_fallback": "mip_mip_fallback_unique"}
+SUMMARY_KEY = {"base_sa": "cp_sa", "base_ipu": "cp_ipu",
+               "mip_sa": "mip_sa", "mip_ipu": "mip_ipu",
+               "cp_mip_fallback": "cp_mip_fallback"}
 
 methods = []
 for arm in ARMS:
@@ -225,11 +228,11 @@ payload = {
         "special": special,
         "fitting_tables": 19,
         "heldout_tables": 7,
-        "note": ("v8 corrected-control run. Four configurations: CP-only, "
-                 "CP-MIP without fallback, CP-MIP with fallback, and the "
-                 "unique fallback mode. RSSZ is per-zone on the 19-table "
-                 "fitting basis. Marginal shares are cohort-level across the "
-                 "362 fitted zones, not per zone."),
+        "note": ("v8 corrected-control run. Five configurations: the CP pool "
+                 "with SA and IPU, and the expanded pool with SA, IPU and MIP. "
+                 "RSSZ is per-zone on the 19-table fitting basis. Marginal "
+                 "shares are cohort-level across the 362 fitted zones, not per "
+                 "zone."),
     },
 }
 with open(os.path.join(OUT, "results.js"), "w", encoding="utf-8") as fh:
