@@ -10,10 +10,11 @@ import pandas as pd
 RUN = r"Z:\Paper_Plan\runs\2026-11-13_v8"
 OUT = r"Z:\Paper_Plan\Population_Synthesiser___GAN_SA"
 ARMS = [
-    ("base_sa", "CP-only", "#E8A33D"),
-    ("cp_mip", "CP-MIP, no fallback", "#4C72B0"),
-    ("cp_mip_fallback", "CP-MIP, fallback", "#1F6FB2"),
-    ("mip_fallback", "CP-MIP, unique fallback", "#9DB4D6"),
+    ("base_sa", "CP pool, SA", "#E8A33D"),
+    ("base_ipu", "CP pool, IPU", "#C44E52"),
+    ("cp_mip_expansion_sa", "Expanded, SA", "#55A868"),
+    ("cp_mip_expansion_ipu", "Expanded, IPU", "#8172B2"),
+    ("cp_mip_fallback", "Expanded, MIP", "#1F6FB2"),
 ]
 TABLES = ["age5p", "assnp", "bedrd", "hhcd", "lfsp", "tenlld", "hcfmf"]
 
@@ -34,8 +35,8 @@ ax.grid(axis="y", color="#DDDDDD", linewidth=0.5)
 ax.set_axisbelow(True)
 ax.spines["top"].set_visible(False)
 ax.spines["right"].set_visible(False)
-ax.legend(fontsize=7.5, ncol=2, frameon=False, loc="upper left")
-ax.set_title("Held-out tables: mean TVD for the unified method and ablations",
+ax.legend(fontsize=7.5, ncol=3, frameon=False, loc="upper left")
+ax.set_title("Held-out tables: mean TVD for the two pools and three fitting methods",
              fontsize=9.5)
 fig.tight_layout()
 path = os.path.join(OUT, "fig_heldout_tvd.png")

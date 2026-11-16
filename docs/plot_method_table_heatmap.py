@@ -14,15 +14,11 @@ RUN = r"Z:\Paper_Plan\runs\2026-11-13_v8"
 OUT = r"Z:\Paper_Plan\Population_Synthesiser___GAN_SA"
 
 ARMS = [
-    ("cp_sa", "CP-only + SA"),
-    ("cp_ipu", "CP-only + IPU"),
-    ("cp_mip", "CP-MIP (rep)"),
-    ("cp_mip_unique", "CP-MIP (unique)"),
-    ("cp_mip_fallback", "CP-MIP + fallback"),
-    ("mip_sa", "MIP + SA"),
-    ("mip_ipu", "MIP + IPU"),
-    ("mip_mip_unique", "MIP (direct)"),
-    ("mip_mip_fallback_unique", "MIP (direct) + fallback"),
+    ("cp_sa", "CP pool, SA"),
+    ("cp_ipu", "CP pool, IPU"),
+    ("mip_sa", "Expanded, SA"),
+    ("mip_ipu", "Expanded, IPU"),
+    ("cp_mip_fallback", "Expanded, MIP"),
 ]
 TABLES = ["heap", "mstp", "mtwp", "occp", "rlhp", "sexp", "qalfp", "qallp",
           "incp", "hrsp", "indp", "typp", "stup", "hind", "mrerd", "nprd",
@@ -69,12 +65,12 @@ for j in range(len(TABLES)):
     ax.scatter(j + 0.33, i - 0.33, marker="*", s=24, color="#D62728",
                zorder=5, edgecolor="white", linewidth=0.3)
 
-ax.axhline(4.5, color="#333333", linewidth=0.8)
-ax.set_title("Mean per-zone RSSZ by method and control table "
+ax.axhline(1.5, color="#333333", linewidth=0.8)
+ax.set_title("Mean per-zone RSSZ by pool and fitting method "
              "(362-zone cohort; lower is better; red star = best per table)",
              fontsize=10, pad=10)
 ax.set_xlabel("Control table", fontsize=8)
-ax.set_ylabel("Method", fontsize=8)
+ax.set_ylabel("Configuration", fontsize=8)
 ax.tick_params(length=0)
 
 cbar = fig.colorbar(im, ax=ax, pad=0.015, fraction=0.025)

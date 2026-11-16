@@ -14,9 +14,10 @@ RUN = r"Z:\Paper_Plan\runs\2026-11-13_v8"
 OUT = r"Z:\Paper_Plan\Population_Synthesiser___GAN_SA"
 
 ROWS = [
-    ("cp_mip", "CP-MIP, no fallback"),
-    ("cp_mip_fallback", "CP-MIP, fallback"),
-    ("mip_mip_fallback_unique", "CP-MIP, unique fallback"),
+    ("cp_ipu", "CP pool, IPU"),
+    ("mip_sa", "Expanded, SA"),
+    ("mip_ipu", "Expanded, IPU"),
+    ("cp_mip_fallback", "Expanded, MIP"),
 ]
 TABLES = ["heap", "mstp", "mtwp", "occp", "rlhp", "sexp", "qalfp", "qallp",
           "incp", "hrsp", "indp", "typp", "stup", "hind", "mrerd", "nprd",
@@ -47,7 +48,7 @@ for i in range(len(ROWS)):
         ax.text(j, i, txt, ha="center", va="center", fontsize=5.4,
                 color="white" if abs(v) > 0.55 * lim else "#222222")
 
-ax.set_title("Change in mean per-zone RSSZ relative to CP-only "
+ax.set_title("Change in mean per-zone RSSZ relative to the CP pool with SA "
              "(blue = better, red = worse)", fontsize=10, pad=10)
 ax.set_xlabel("Control table", fontsize=8)
 ax.set_ylabel("Configuration", fontsize=8)
