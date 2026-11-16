@@ -18,6 +18,7 @@ ROWS = [
     ("mip_sa", "Expanded, SA"),
     ("mip_ipu", "Expanded, IPU"),
     ("cp_mip_fallback", "Expanded, MIP"),
+    ("mip_mip_fallback_unique", "Expanded, MIP unique"),
 ]
 TABLES = ["heap", "mstp", "mtwp", "occp", "rlhp", "sexp", "qalfp", "qallp",
           "incp", "hrsp", "indp", "typp", "stup", "hind", "mrerd", "nprd",

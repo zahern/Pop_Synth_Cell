@@ -16,8 +16,8 @@ observed and synthesized marginal shares.
   coloured by per-zone 19-table RSSZ for the selected configuration. Hover for the zone
   name, code, RSSZ and rank; click to select; scroll to zoom; drag to pan. The
   **Random zone** button picks a fitted zone at random.
-- **Method selector**: the five configurations of the paper: CP pool with SA
-  and IPU, and the expanded pool with SA, IPU and MIP.
+- **Method selector**: the six configurations of the paper: CP pool with SA
+  and IPU, and the expanded pool with SA, IPU, MIP and unique MIP.
 - **Zone detail**: per-zone RSSZ, rank, per-table RSSZ bars (19 tables), and the
   method's median/mean RSSZ, held-out mean RSSZ, joint
   TVD, identical-person share and single-zone share.

@@ -18,7 +18,8 @@ RUN = r"Z:/Paper_Plan/runs/2026-11-13_v8"
 OUT = os.path.join(PAPER, "dashboard", "data")
 os.makedirs(OUT, exist_ok=True)
 
-ARMS = ["base_sa", "base_ipu", "mip_sa", "mip_ipu", "cp_mip_fallback"]
+ARMS = ["base_sa", "base_ipu", "mip_sa", "mip_ipu", "cp_mip_fallback",
+        "mip_fallback"]
 
 META = {
     "base_sa": dict(label="CP pool, SA", pool="CP feasible pool", fitting="SA",
@@ -40,6 +41,11 @@ META = {
                             fitting="Integer MIP",
                             settings="REP_MAX 4, lambda_joint 20; replication allowed",
                             desc="Reported method: CP construction, MIP expansion and the fitting MIP."),
+    "mip_fallback": dict(label="Expanded, MIP unique",
+                         pool="CP pool + expansion",
+                         fitting="Integer MIP (unique)",
+                         settings="REP_MAX 1 + adult uniqueness",
+                         desc="Uniqueness-constrained MIP; the population propagated to the ABM."),
 }
 
 TABLES = [
@@ -152,15 +158,18 @@ if os.path.exists(audit_path):
 
 HELD_KEY = {"base_sa": "CP-only+SA", "base_ipu": "CP-only+IPU",
             "mip_sa": "MIP+SA", "mip_ipu": "MIP+IPU",
-            "cp_mip_fallback": "CP-MIP+fallback"}
+            "cp_mip_fallback": "CP-MIP+fallback",
+            "mip_fallback": "MIP (direct)+fallback"}
 AUDIT_KEY = {"base_sa": "base_sa", "base_ipu": "base_ipu",
              "mip_sa": "cp_mip_expansion_sa",
              "mip_ipu": "cp_mip_expansion_ipu",
-             "cp_mip_fallback": "cp_mip_fallback"}
+             "cp_mip_fallback": "cp_mip_fallback",
+             "mip_fallback": "mip_mip_fallback_unique"}
 
 SUMMARY_KEY = {"base_sa": "cp_sa", "base_ipu": "cp_ipu",
                "mip_sa": "mip_sa", "mip_ipu": "mip_ipu",
-               "cp_mip_fallback": "cp_mip_fallback"}
+               "cp_mip_fallback": "cp_mip_fallback",
+               "mip_fallback": "mip_mip_fallback_unique"}
 
 methods = []
 for arm in ARMS:

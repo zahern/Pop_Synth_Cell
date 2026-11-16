@@ -15,6 +15,7 @@ ARMS = [
     ("cp_mip_expansion_sa", "Expanded, SA", "#55A868"),
     ("cp_mip_expansion_ipu", "Expanded, IPU", "#8172B2"),
     ("cp_mip_fallback", "Expanded, MIP", "#1F6FB2"),
+    ("mip_fallback", "Expanded, MIP unique", "#9DB4D6"),
 ]
 TABLES = ["age5p", "assnp", "bedrd", "hhcd", "lfsp", "tenlld", "hcfmf"]
 
@@ -36,7 +37,7 @@ ax.set_axisbelow(True)
 ax.spines["top"].set_visible(False)
 ax.spines["right"].set_visible(False)
 ax.legend(fontsize=7.5, ncol=3, frameon=False, loc="upper left")
-ax.set_title("Held-out tables: mean TVD for the two pools and three fitting methods",
+ax.set_title("Held-out tables: mean TVD for the two pools and four fitting methods",
              fontsize=9.5)
 fig.tight_layout()
 path = os.path.join(OUT, "fig_heldout_tvd.png")
