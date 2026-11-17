@@ -302,6 +302,23 @@
   </section>
 
   <section class="panel methods">
+    <h2>Travel-survey validation</h2>
+    <p>The fitted population is checked against the attached Queensland Travel Survey attributes: household bicycles, e-bikes and e-scooters, and person car and motorcycle licences. The panels show overall shares, bicycle ownership by household size and composition, car licence by age band, spatial differences by SA4 and zone-size quintile, and observed-donor coverage by region.</p>
+    <figure style="margin:14px 0 22px;">
+      <img src="fig_hhts_validation.png" alt="HHTS attributes in the fitted population and attached pool" style="width:100%;max-width:1100px;border:1px solid #ddd;border-radius:6px;">
+      <figcaption style="font-size:12px;color:#555;margin-top:6px;">Overall HHTS shares, bicycle ownership by household size, car licence by age band, and bicycle ownership by household composition.</figcaption>
+    </figure>
+    <figure style="margin:14px 0 22px;">
+      <img src="fig_hhts_spatial.png" alt="HHTS differences by SA4 and zone-size quintile" style="width:100%;max-width:1100px;border:1px solid #ddd;border-radius:6px;">
+      <figcaption style="font-size:12px;color:#555;margin-top:6px;">Fitted minus attached-pool difference by SA4 and by zone-size quintile.</figcaption>
+    </figure>
+    <figure style="margin:14px 0 22px;">
+      <img src="fig_hhts_coverage.png" alt="HHTS donor coverage by region" style="width:100%;max-width:900px;border:1px solid #ddd;border-radius:6px;">
+      <figcaption style="font-size:12px;color:#555;margin-top:6px;">Observed HHTS donor households per 100 target households. All 362 zones have an observed donor; no household is filled by hot-deck.</figcaption>
+    </figure>
+  </section>
+
+  <section class="panel methods">
     <h2>What each method is</h2>
     <p class="intro">The method has three stages. <b>CP construction</b> builds a rule-feasible candidate pool; the <b>expansion MIP</b> adds donor--shell households and constructed carriers for zero-capacity cells; the <b>fitting MIP</b> then selects households from the resulting pool. The six configurations compare the CP pool with SA and IPU, and the expanded pool with SA, IPU, MIP and unique MIP.</p>
     <div class="method-grid" id="method-grid"></div>
