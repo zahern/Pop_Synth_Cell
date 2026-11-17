@@ -303,10 +303,10 @@
 
   <section class="panel methods">
     <h2>Travel-survey validation</h2>
-    <p>The fitted population is checked against the attached Queensland Travel Survey attributes: household bicycles, e-bikes and e-scooters, and person car and motorcycle licences. The panels show overall shares, bicycle ownership by household size and composition, car licence by age band, spatial differences by SA4 and zone-size quintile, and observed-donor coverage by region.</p>
+    <p>The fitted population is checked against the attached Queensland Travel Survey attributes: household bicycles, e-bikes and e-scooters, and person car and motorcycle licences. The panels show fitted minus attached-pool differences as heatmaps by household composition, household size, age band and reference/member age, spatial differences by SA4 and zone-size quintile, observed-donor coverage, and the spatial age distribution across SA2s.</p>
     <figure style="margin:14px 0 22px;">
-      <img src="fig_hhts_validation.png" alt="HHTS attributes in the fitted population and attached pool" style="width:100%;max-width:1100px;border:1px solid #ddd;border-radius:6px;">
-      <figcaption style="font-size:12px;color:#555;margin-top:6px;">Overall HHTS shares, bicycle ownership by household size, car licence by age band, and bicycle ownership by household composition.</figcaption>
+      <img src="fig_hhts_validation.png" alt="HHTS heatmaps of fitted minus attached-pool differences" style="width:100%;max-width:1100px;border:1px solid #ddd;border-radius:6px;">
+      <figcaption style="font-size:12px;color:#555;margin-top:6px;">Fitted minus attached-pool differences (pp) by household composition and bicycle count, household size and bicycle count, age band and licence, and reference-person age and household-member age.</figcaption>
     </figure>
     <figure style="margin:14px 0 22px;">
       <img src="fig_hhts_spatial.png" alt="HHTS differences by SA4 and zone-size quintile" style="width:100%;max-width:1100px;border:1px solid #ddd;border-radius:6px;">
@@ -315,6 +315,10 @@
     <figure style="margin:14px 0 22px;">
       <img src="fig_hhts_coverage.png" alt="HHTS donor coverage by region" style="width:100%;max-width:900px;border:1px solid #ddd;border-radius:6px;">
       <figcaption style="font-size:12px;color:#555;margin-top:6px;">Observed HHTS donor households per 100 target households. All 362 zones have an observed donor; no household is filled by hot-deck.</figcaption>
+    </figure>
+    <figure style="margin:14px 0 22px;">
+      <img src="fig_age_spatial.png" alt="Spatial distribution of the fitted population by age group" style="width:100%;max-width:1100px;border:1px solid #ddd;border-radius:6px;">
+      <figcaption style="font-size:12px;color:#555;margin-top:6px;">Share of the fitted population in each age group across the 362 SA2s, plus total population. Boundaries: ABS 2021 SA2s. <a href="data/seq_sa2_2021.geojson">GeoJSON</a> · <a href="data/seq_sa2_2021_shapefile.zip">zipped shapefile</a>.</figcaption>
     </figure>
   </section>
 
