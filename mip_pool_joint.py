@@ -10,7 +10,7 @@ moves the decision to one selection program per zone:
                e_c >= 0          coverage slack below nu_c
                d_{k,m} >= 0      joint marginal deviation
 
-    min        lambda_0 sum e_c + sum w_{k,m} d_{k,m} + lambda_1 sum x_j
+    min        lambda_0 sum e_c + lambda_c sum w_{k,m} d_{k,m} + lambda_1 sum x_j
     s.t.       sum_j a_{j,c} x_j + e_c >= nu_c        zero cells
                |sum_j (a_{j,k,m} - q_{k,m} u_{j,k}) x_j| <= d_{k,m}
                sum_j x_j <= K_z, sum_j s_j x_j <= P_add
@@ -18,6 +18,8 @@ moves the decision to one selection program per zone:
 
 with nu_c = ceil(E_{z,k,m} / rep_max) and K_z = sum_c nu_c: the number of
 distinct carrier contributions is set by the cell target, not by a fixed budget.
+A post-selection swap pass enforces the same balance criterion when the solver
+returns an incumbent or the coverage-first greedy fallback is used.
 
 Every deviation is computed from the same x for every control table, so the
 selected agents are fitted to the zone's marginal composition jointly rather
@@ -650,6 +652,55 @@ def greedy_selection(A, sizes, zero_mask, max_households=64,
     return x
 
 
+def balance_swaps(x, A, B, w, zero_mask, zero_need=None, shell_ids=None,
+                  max_iters=5):
+    """Improve marginal balance without losing zero-cell coverage.
+
+    The joint MIP already carries a marginal-deviation term, but a solver
+    incumbent or the coverage-first greedy fallback can return a coverage set
+    whose aggregate marginals are unnecessarily far from the zone target.  This
+    pass swaps one selected carrier for one unselected carrier whenever the
+    swap keeps every zero cell at its carrier requirement and lowers the
+    weighted absolute deviation.  Coverage is therefore never traded away.
+    """
+    x = np.asarray(x, dtype=float).copy()
+    zero_mask = np.asarray(zero_mask, dtype=bool)
+    requirement = (np.ones(int(zero_mask.sum()), dtype=float)
+                   if zero_need is None
+                   else np.asarray(zero_need, dtype=float))
+    if shell_ids is None:
+        shell_ids = [None] * len(x)
+
+    for _ in range(max_iters):
+        selected = np.flatnonzero(x > 0)
+        unselected = np.flatnonzero(x == 0)
+        if not len(selected) or not len(unselected):
+            break
+        v = B.T.dot(x)
+        current = float(np.dot(w, np.abs(v)))
+        contribution = A.T.dot(x)
+        used_shells = {shell_ids[j] for j in selected
+                       if shell_ids[j] is not None}
+        best_obj, best_pair = current, None
+        for j in selected:
+            for k in unselected:
+                shell = shell_ids[k]
+                if (shell is not None and shell in used_shells
+                        and shell != shell_ids[j]):
+                    continue
+                candidate = contribution - A[j] + A[k]
+                if np.any(candidate[zero_mask] < requirement):
+                    continue
+                obj = float(np.dot(w, np.abs(v - B[j] + B[k])))
+                if obj < best_obj - 1e-10:
+                    best_obj, best_pair = obj, (j, k)
+        if best_pair is None:
+            break
+        j, k = best_pair
+        x[j], x[k] = 0.0, 1.0
+    return x
+
+
 # ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
@@ -965,6 +1016,7 @@ def run_joint(pool_path, census_path, rep_max, out_path,
                 max_mtwp17_share=max_mtwp17_share,
                 min_admitted_households=min_admitted_households)
             if x is None:
+                used_greedy = True
                 A = C_cand.T.toarray().astype(float)
                 B, w = _deviation_terms(
                     A, T_cand, cells_cand, sizes, hh_attr_set)
@@ -973,10 +1025,23 @@ def run_joint(pool_path, census_path, rep_max, out_path,
                     max_households=zone_max_households,
                     max_persons=zone_max_persons, shell_ids=shell_ids,
                     zero_need=zero_need_cand)
-                stats = _selection_stats(
-                    x, A, B, w, zero_mask_cand, sizes,
-                    zero_need=zero_need_cand)
-                stats["solver"] = "greedy"
+            else:
+                used_greedy = False
+
+            # Enforce the balance criterion after either path: coverage is
+            # held fixed while the selected set is swapped toward the zone's
+            # marginal composition.
+            A = C_cand.T.toarray().astype(float)
+            B, w = _deviation_terms(
+                A, T_cand, cells_cand, sizes, hh_attr_set)
+            x = balance_swaps(
+                x, A, B, w, zero_mask_cand, zero_need=zero_need_cand,
+                shell_ids=shell_ids)
+            stats = _selection_stats(
+                x, A, B, w, zero_mask_cand, sizes,
+                zero_need=zero_need_cand)
+            if used_greedy:
+                stats["solver"] = "greedy+balance"
 
             selected = np.flatnonzero(np.asarray(x) > 0)
             if len(selected) == 0:
