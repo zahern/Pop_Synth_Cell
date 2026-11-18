@@ -87,34 +87,35 @@ def main() -> None:
     panels = []
     for table, title, labels in TABLES:
         codes0 = sorted(labels)
-        target = {c: 0.0 for c in codes0}
-        stage = {name: {c: 0.0 for c in codes0} for name, _ in STAGES}
-        total_w = 0.0
+        target_mean = {c: 0.0 for c in codes0}
+        dev_sum = {name: {c: 0.0 for c in codes0} for name, _ in STAGES}
+        n_zones = 0
         for _, r in z.iterrows():
-            zone, sa4, w = r.zone, r.sa4, float(r.person_target)
+            zone, sa4 = r.zone, r.sa4
             tt = tgt.get(zone, {}).get(table)
-            if not tt or w <= 0:
+            if not tt:
                 continue
-            total_w += w
+            n_zones += 1
             for c in codes0:
-                target[c] += w * tt.get(c, 0.0)
+                target_mean[c] += tt.get(c, 0.0)
             for name, shares in (("Raw", raw_s), ("CP", cp_s),
                                  ("MIP", mip_s)):
                 sh = shares[sa4][table]
                 for c in codes0:
-                    stage[name][c] += w * sh.get(c, 0.0)
+                    dev_sum[name][c] += 100.0 * (sh.get(c, 0.0)
+                                                 - tt.get(c, 0.0))
 
-        target = {c: v / total_w for c, v in target.items()}
-        codes = sorted(codes0, key=lambda c: -target[c])
+        target_mean = {c: v / n_zones for c, v in target_mean.items()}
+        codes = sorted(codes0, key=lambda c: -target_mean[c])
         dev = np.zeros((len(codes), len(STAGES)))
         for j, (name, _label) in enumerate(STAGES):
             for i, c in enumerate(codes):
-                dev[i, j] = 100.0 * (stage[name][c] / total_w - target[c])
+                dev[i, j] = dev_sum[name][c] / n_zones
         all_vals.append(dev)
-        panels.append((table, title, labels, codes, target, dev))
+        panels.append((table, title, labels, codes, target_mean, dev))
 
-    lim = max(2.0, float(np.percentile(np.abs(np.concatenate(
-        [d.ravel() for d in all_vals])), 98)))
+    stacked = np.concatenate([d.ravel() for d in all_vals])
+    lim = max(1.0, float(np.ceil(np.max(np.abs(stacked)))))
     norm = TwoSlopeNorm(vcenter=0.0, vmin=-lim, vmax=lim)
     cmap = plt.get_cmap("RdBu_r")
 
@@ -140,11 +141,12 @@ def main() -> None:
 
     cax = fig.add_axes([0.24, 0.028, 0.52, 0.012])
     cbar = fig.colorbar(im, cax=cax, orientation="horizontal")
-    cbar.set_label("Pooled share minus pooled census share (percentage points)",
+    cbar.set_label("Mean per-zone share minus census share (percentage points)",
                    fontsize=6.5)
     cbar.ax.tick_params(labelsize=6)
-    fig.suptitle("Pool progression for all fitted zones pooled together: "
-                 "each stage minus the census marginal", fontsize=8.6, y=0.98)
+    fig.suptitle("Mean per-zone pool progression across all fitted zones: "
+                 "each stage minus the zone's census marginal",
+                 fontsize=8.6, y=0.98)
     fig.subplots_adjust(bottom=0.10, hspace=0.42, wspace=0.62)
     path = os.path.join(OUT, "fig_zone_progression_all.png")
     fig.savefig(path, dpi=220, bbox_inches="tight")
