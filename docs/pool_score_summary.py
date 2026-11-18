@@ -1,4 +1,4 @@
-"""Generalised pool score: mean marginal TVD over the 17 valid control tables.
+"""Generalised pool score: mean marginal TVD over the 19 control tables.
 
 Stages compared before fitting:
   raw SA4 slice, CP pool, expanded pool, CP + fallback, expanded + fallback.
@@ -35,7 +35,7 @@ from CensusRecordImporter import CensusControlTable  # noqa: E402
 TABLES = [("heap", 0), ("mstp", 0), ("mtwp", 0), ("occp", 0), ("rlhp", 0),
           ("sexp", 0), ("qalfp", 0), ("qallp", 0), ("incp", 0), ("hrsp", 0),
           ("indp", 0), ("typp", 0), ("stup", 0), ("hind", 1), ("mrerd", 1),
-          ("rntrd", 1), ("vehrd", 1)]          # nprd, strd excluded
+          ("nprd", 1), ("rntrd", 1), ("vehrd", 1), ("strd", 1)]
 HH = {t for t, h in TABLES if h}
 
 _ct = CensusControlTable.__new__(CensusControlTable)
@@ -116,8 +116,17 @@ def main() -> None:
             for z, g in fb_by.items()}
 
     tgt = targets()
+    geo = pd.read_csv(os.path.join(SYNTH, "sa2_zones_reference_357.csv"),
+                      dtype={"sa2_code": str, "sa4_code": str})
+    geo["sa2_code"] = geo.sa2_code.str.zfill(9)
+    geo["sa4_code"] = geo.sa4_code.str.zfill(3)
     csf = pd.read_csv(CSF, dtype=str)
-    zone_sa4 = dict(zip(csf.sa2.str.zfill(9), csf.regucp.astype(str)))
+    csf["sa2"] = csf.sa2.str.zfill(9)
+    csf["regucp"] = csf.regucp.str.zfill(2)
+    both = geo.merge(csf, left_on="sa2_code", right_on="sa2", how="inner")
+    sa4_to_reg = both.drop_duplicates("sa4_code").set_index("sa4_code").regucp
+    geo["regucp"] = geo.sa4_code.map(sa4_to_reg)
+    zone_sa4 = dict(zip(geo.sa2_code, geo.regucp))
 
     z = pd.read_csv(ZONES)
     z = z[z.arm == "cp_mip"][["zone", "person_target"]].dropna()
@@ -181,7 +190,7 @@ def main() -> None:
                 fontsize=7.2)
     ax.set_xticks(x)
     ax.set_xticklabels(stages, fontsize=6.8, rotation=22, ha="right")
-    ax.set_ylabel("Mean TVD to the census marginal (17 tables)")
+    ax.set_ylabel("Mean TVD to the census marginal (19 tables)")
     ax.set_ylim(0, summary.mean_tvd.max() * 1.24)
     ax.grid(axis="y", color="#DDDDDD", linewidth=0.5)
     ax.set_axisbelow(True)

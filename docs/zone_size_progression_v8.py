@@ -109,8 +109,17 @@ def main() -> None:
     mip_s = sa4_shares(mip)
 
     tgt = zone_targets()
+    geo = pd.read_csv(os.path.join(SYNTH, "sa2_zones_reference_357.csv"),
+                      dtype={"sa2_code": str, "sa4_code": str})
+    geo["sa2_code"] = geo.sa2_code.str.zfill(9)
+    geo["sa4_code"] = geo.sa4_code.str.zfill(3)
     csf = pd.read_csv(CSF, dtype=str)
-    zone_sa4 = dict(zip(csf.sa2.str.zfill(9), csf.regucp.astype(str)))
+    csf["sa2"] = csf.sa2.str.zfill(9)
+    csf["regucp"] = csf.regucp.str.zfill(2)
+    both = geo.merge(csf, left_on="sa2_code", right_on="sa2", how="inner")
+    sa4_to_reg = both.drop_duplicates("sa4_code").set_index("sa4_code").regucp
+    geo["regucp"] = geo.sa4_code.map(sa4_to_reg)
+    zone_sa4 = dict(zip(geo.sa2_code, geo.regucp))
 
     z = pd.read_csv(ZONES)
     z = z[z.arm == "cp_mip"][["zone", "person_target"]].dropna()
@@ -150,10 +159,9 @@ def main() -> None:
 
     g = (d.groupby(["quintile", "table"])[["raw", "cp", "mip"]].mean()
          .reset_index())
-    # mean over the 17 tables without the known code-domain mismatches
-    d_plot = d[~d.table.isin(["nprd", "strd"])]
-    tab_mean = d_plot.groupby("quintile")[["raw", "cp", "mip"]].mean()
-    print("\nmean TVD over 17 tables by quintile (nprd, strd excluded)")
+    # mean over all 19 control tables
+    tab_mean = d.groupby("quintile")[["raw", "cp", "mip"]].mean()
+    print("\nmean TVD over 19 tables by quintile")
     print(tab_mean.round(4).to_string())
 
     colours = {"raw": "#9E9E9E", "cp": "#4FB3A0", "mip": "#7B5EA7"}
@@ -164,7 +172,7 @@ def main() -> None:
                 label=labels[key], linewidth=1.6, markersize=5)
     ax.set_xticks([1, 2, 3, 4, 5])
     ax.set_xticklabels(["Q1\nsmallest", "Q2", "Q3", "Q4", "Q5\nlargest"])
-    ax.set_ylabel("Mean TVD to the census marginal (17 tables)")
+    ax.set_ylabel("Mean TVD to the census marginal (19 tables)")
     ax.set_xlabel("Zone population quintile")
     ax.grid(axis="y", color="#DDDDDD", linewidth=0.5)
     ax.set_axisbelow(True)
