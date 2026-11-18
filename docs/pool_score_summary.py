@@ -160,7 +160,9 @@ def main() -> None:
                 "CP + fallback": tvd(to_shares(cp_plus), t),
                 "Expanded + fallback": tvd(to_shares(mip_plus), t),
             }
-            rows.append({"zone": zone, "table": table, **vals})
+            max_tvd = 1.0 - min(v for v in t.values() if v == v)
+            rows.append({"zone": zone, "table": table, "max_tvd": max_tvd,
+                         **vals})
 
     d = pd.DataFrame(rows)
     d.to_csv(os.path.join(HERE, "tables", "pool_score_by_zone_table.csv"),

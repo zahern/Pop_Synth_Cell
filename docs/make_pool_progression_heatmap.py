@@ -15,7 +15,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.colors import TwoSlopeNorm
+from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 
 RUN = r"Z:\Paper_Plan\runs\2026-11-13_v8"
 OUT = r"Z:\Paper_Plan\Population_Synthesiser___GAN_SA"
@@ -27,6 +27,9 @@ sys.path.insert(0, SYNTH)
 from zone_size_progression_v8 import (  # noqa: E402
     CSF, ZONES, read_pool, sa4_shares, zone_targets, RAW, CP, MIP,
 )
+import pool_score_summary as pss  # noqa: E402
+import make_marginal_histograms as mmh  # noqa: E402
+import glob  # noqa: E402
 
 TABLES = [
     ("qalfp", "Field of study", {
@@ -44,7 +47,7 @@ TABLES = [
     }),
 ]
 STAGES = [("Raw", "Raw SA4 slice"), ("CP", "CP pool"),
-          ("MIP", "Expanded pool")]
+          ("FIT", "Fitted population")]
 
 
 def main() -> None:
@@ -84,7 +87,49 @@ def main() -> None:
     reps = pd.concat(reps)
     print(reps[["zone", "person_target", "quintile"]].to_string(index=False))
 
-    fig, axes = plt.subplots(2, 3, figsize=(7.8, 7.4))
+    # Expanded pool completed with the zone-tagged carriers: the final pool
+    # that fills the remaining zero-capacity cells.
+    HH = {t for t, h in pss.TABLES if h}
+    mip_df = mip.copy()
+    mip_df["regucp"] = mip_df.regucp.astype(str).str.zfill(2)
+    mip_c = {}
+    for sa4, sub in mip_df.groupby("regucp"):
+        mip_c[sa4] = {t: pss.counts(sub, t, t in HH) for t, _h in pss.TABLES}
+    fb = pd.read_csv(os.path.join(RUN, "pools", "fallback_carriers.csv"),
+                     low_memory=False)
+    fb.columns = [c.lower() for c in fb.columns]
+    fb["_target_sa2"] = fb._target_sa2.astype(str).str.zfill(9)
+    fb_c = {z: {t: pss.counts(g, t, t in HH) for t, _h in pss.TABLES}
+            for z, g in fb.groupby("_target_sa2")}
+    completed = {}
+    for z in reps.zone:
+        sa4 = zone_sa4[z]
+        for table, _h in pss.TABLES:
+            car = fb_c.get(z, {}).get(table, {})
+            plus = {k: mip_c[sa4][table].get(k, 0) + car.get(k, 0)
+                    for k in set(mip_c[sa4][table]) | set(car)}
+            completed[(z, table)] = pss.to_shares(plus)
+
+    # Fitted population: the stage where the fitting method rebalances the
+    # marginals after expansion.
+    controls = mmh.load_all_controls(os.path.join(SYNTH,
+                                                  "data_sa2_controls_v8"))
+    single = {}
+    for k, ct in controls.items():
+        ct["key"] = __import__("re").sub(r"^sa[12]", "", str(k).lower())
+        if len(ct["attr_cols"]) == 1:
+            single[ct["key"]] = ct
+    fit_shares = {}
+    for z in reps.zone:
+        path = glob.glob(os.path.join(
+            RUN, "fits", "mip_mip_fallback_unique", "**",
+            f"zone_{z}_synthetic_population.csv"), recursive=True)[0]
+        got = mmh.aggregate_zone(path, single) or {}
+        for table, _h in pss.TABLES:
+            counts = {c: n for (k, c), n in got.items() if k == table}
+            fit_shares[(z, table)] = pss.to_shares(counts)
+
+    fig, axes = plt.subplots(2, 3, figsize=(8.6, 7.2))
     all_vals = []
     panels = []
     for row, (table, title, labels) in enumerate(TABLES):
@@ -96,9 +141,13 @@ def main() -> None:
                 mean_target[c] += tt.get(c, 0.0) / len(reps)
         codes = sorted(codes0, key=lambda c: -mean_target[c])
         for col, (stage, stage_label) in enumerate(STAGES):
-            shares = {"Raw": raw_s, "CP": cp_s, "MIP": mip_s}[stage]
             mat = np.array([
-                [100.0 * (shares[r.sa4][table].get(c, 0.0)
+                [100.0 * ((completed[(r.zone, table)].get(c, 0.0)
+                           if stage == "MIP"
+                           else fit_shares[(r.zone, table)].get(c, 0.0)
+                           if stage == "FIT"
+                           else {"Raw": raw_s, "CP": cp_s}[stage]
+                           [r.sa4][table].get(c, 0.0))
                           - tgt[r.zone][table].get(c, 0.0))
                  for _, r in reps.iterrows()]
                 for c in codes
@@ -109,10 +158,14 @@ def main() -> None:
     lim = max(1.0, float(np.ceil(np.max(np.abs(np.concatenate(
         [d.ravel() for d in all_vals]))))))
     norm = TwoSlopeNorm(vcenter=0.0, vmin=-lim, vmax=lim)
+    cmap = LinearSegmentedColormap.from_list(
+        "zero_blue_tails_red",
+        [(0.0, "#B2182B"), (0.25, "#F7F7F7"), (0.5, "#2166AC"),
+         (0.75, "#F7F7F7"), (1.0, "#B2182B")])
 
     for row, col, title, stage_label, labels, codes, mat in panels:
         ax = axes[row, col]
-        im = ax.imshow(mat, aspect="auto", cmap="RdBu_r", norm=norm)
+        im = ax.imshow(mat, aspect="auto", cmap=cmap, norm=norm)
         ax.set_xticks(np.arange(len(reps)))
         ax.set_xticklabels([f"Q{int(q)}" for q in reps.quintile],
                            fontsize=7.0)
@@ -128,7 +181,8 @@ def main() -> None:
             for j in range(mat.shape[1]):
                 ax.text(j, i, f"{mat[i, j]:+.1f}", ha="center", va="center",
                         fontsize=5.6,
-                        color="white" if abs(mat[i, j]) > 0.55 * lim
+                        color="white" if (abs(mat[i, j]) > 0.55 * lim
+                                          or abs(mat[i, j]) < 0.12 * lim)
                         else "#222222")
         ax.set_xticks(np.arange(-.5, len(reps), 1), minor=True)
         ax.set_yticks(np.arange(-.5, len(codes), 1), minor=True)
@@ -137,11 +191,11 @@ def main() -> None:
 
     cax = fig.add_axes([0.24, 0.025, 0.52, 0.013])
     cbar = fig.colorbar(im, cax=cax, orientation="horizontal")
-    cbar.set_label("Stage share minus census share (percentage points)",
+    cbar.set_label("Gap magnitude (blue = near zero, red = large gap)",
                    fontsize=6.5)
     cbar.ax.tick_params(labelsize=6)
-    fig.suptitle("Pool progression for five representative zones across the "
-                 "population-size quintiles", fontsize=9.2, y=0.985)
+    fig.suptitle("Progression from the raw slice to the fitted population for "
+                 "five representative zones", fontsize=9.2, y=0.985)
     fig.text(0.012, 0.72, "Field of study", rotation=90, va="center",
              fontsize=9.0, fontweight="bold")
     fig.text(0.012, 0.31, "Highest education", rotation=90, va="center",

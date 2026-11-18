@@ -18,7 +18,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.colors import TwoSlopeNorm
+from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
+import glob
 
 RUN = r"Z:\Paper_Plan\runs\2026-11-13_v8"
 OUT = r"Z:\Paper_Plan\Population_Synthesiser___GAN_SA"
@@ -30,6 +31,7 @@ sys.path.insert(0, SYNTH)
 from zone_size_progression_v8 import (  # noqa: E402
     ZONES, read_pool, sa4_shares, zone_targets, RAW, CP, MIP,
 )
+import make_marginal_histograms as mmh  # noqa: E402
 
 TABLES = [
     ("qalfp", "Field of study", {
@@ -56,7 +58,8 @@ TABLES = [
         10: "Not stated", 11: "Not applicable",
     }),
 ]
-STAGES = [("Raw", "Raw"), ("CP", "CP"), ("MIP", "Expanded")]
+STAGES = [("Raw", "Raw"), ("CP", "CP"), ("MIP", "Expanded"),
+          ("FIT", "Fitted")]
 
 
 def main() -> None:
@@ -81,7 +84,32 @@ def main() -> None:
     z = z[z.sa4.isin(cp_s)]
     print(f"zones {len(z)}")
 
-    fig, axes = plt.subplots(2, 2, figsize=(7.6, 7.4))
+    controls = mmh.load_all_controls(os.path.join(SYNTH,
+                                                  "data_sa2_controls_v8"))
+    single = {}
+    for k, ct in controls.items():
+        ct["key"] = __import__("re").sub(r"^sa[12]", "", str(k).lower())
+        if len(ct["attr_cols"]) == 1:
+            single[ct["key"]] = ct
+
+    def to_shares(counts):
+        tot = sum(counts.values())
+        return {k: v / tot for k, v in counts.items()} if tot else {}
+
+    fit_share = {}
+    table_keys = [t for t, _title, _labels in TABLES]
+    for i, zone in enumerate(z.zone, 1):
+        path = glob.glob(os.path.join(
+            RUN, "fits", "mip_mip_fallback_unique", "**",
+            f"zone_{zone}_synthetic_population.csv"), recursive=True)[0]
+        got = mmh.aggregate_zone(path, single) or {}
+        for table in table_keys:
+            counts = {c: n for (k, c), n in got.items() if k == table}
+            fit_share[(zone, table)] = to_shares(counts)
+        if i % 50 == 0:
+            print(f"  fitted shares {i}/{len(z)}", flush=True)
+
+    fig, axes = plt.subplots(2, 2, figsize=(8.4, 7.4))
     axes = axes.ravel()
     all_vals = []
     panels = []
@@ -99,8 +127,9 @@ def main() -> None:
             for c in codes0:
                 target_mean[c] += tt.get(c, 0.0)
             for name, shares in (("Raw", raw_s), ("CP", cp_s),
-                                 ("MIP", mip_s)):
-                sh = shares[sa4][table]
+                                 ("MIP", mip_s), ("FIT", None)):
+                sh = (fit_share[(zone, table)] if name == "FIT"
+                      else shares[sa4][table])
                 for c in codes0:
                     dev_sum[name][c] += 100.0 * (sh.get(c, 0.0)
                                                  - tt.get(c, 0.0))
@@ -117,7 +146,10 @@ def main() -> None:
     stacked = np.concatenate([d.ravel() for d in all_vals])
     lim = max(1.0, float(np.ceil(np.max(np.abs(stacked)))))
     norm = TwoSlopeNorm(vcenter=0.0, vmin=-lim, vmax=lim)
-    cmap = plt.get_cmap("RdBu_r")
+    cmap = LinearSegmentedColormap.from_list(
+        "zero_blue_tails_red",
+        [(0.0, "#B2182B"), (0.25, "#F7F7F7"), (0.5, "#2166AC"),
+         (0.75, "#F7F7F7"), (1.0, "#B2182B")])
 
     for ax, (table, title, labels, codes, target, dev) in zip(axes, panels):
         im = ax.imshow(dev, aspect="auto", cmap=cmap, norm=norm)
@@ -133,7 +165,9 @@ def main() -> None:
                 v = dev[i, j]
                 ax.text(j, i, f"{v:+.1f}", ha="center", va="center",
                         fontsize=5.7,
-                        color="white" if abs(v) > 0.55 * lim else "#222222")
+                        color="white" if (abs(v) > 0.55 * lim
+                                          or abs(v) < 0.12 * lim)
+                        else "#222222")
         ax.set_xticks(np.arange(-.5, len(STAGES), 1), minor=True)
         ax.set_yticks(np.arange(-.5, len(codes), 1), minor=True)
         ax.grid(which="minor", color="white", linewidth=1.2)
@@ -141,12 +175,11 @@ def main() -> None:
 
     cax = fig.add_axes([0.24, 0.028, 0.52, 0.012])
     cbar = fig.colorbar(im, cax=cax, orientation="horizontal")
-    cbar.set_label("Mean per-zone share minus census share (percentage points)",
+    cbar.set_label("Gap magnitude (blue = near zero, red = large gap)",
                    fontsize=6.5)
     cbar.ax.tick_params(labelsize=6)
-    fig.suptitle("Mean per-zone pool progression across all fitted zones: "
-                 "each stage minus the zone's census marginal",
-                 fontsize=8.6, y=0.98)
+    fig.suptitle("Mean per-zone progression from the raw slice to the fitted "
+                 "population", fontsize=8.6, y=0.98)
     fig.subplots_adjust(bottom=0.10, hspace=0.42, wspace=0.62)
     path = os.path.join(OUT, "fig_zone_progression_all.png")
     fig.savefig(path, dpi=220, bbox_inches="tight")
