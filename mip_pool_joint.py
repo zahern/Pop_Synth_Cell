@@ -21,9 +21,9 @@ distinct carrier contributions is set by the cell target, not by a fixed budget.
 A post-selection swap pass enforces the same balance criterion when the solver
 returns an incumbent or the coverage-first greedy fallback is used.  The
 released defaults are lambda_0=1e5, lambda_c=10 and lambda_1=1e-4; the household
-budget carries a 1.2 headroom above the carrier minimum so the balance term can
-admit additional households when they bring the added set closer to the zone's
-marginal composition.
+budget carries a 2.0 headroom (100% above the carrier minimum) so the balance
+term can admit additional households when they bring the added set closer to the
+zone's marginal composition.
 
 Every deviation is computed from the same x for every control table, so the
 selected agents are fitted to the zone's marginal composition jointly rather
@@ -717,7 +717,7 @@ def run_joint(pool_path, census_path, rep_max, out_path,
               allow_global_donors=True, append_menu_candidates=True,
               append_only=False, id_offset=0, include_partial_deficits=False,
               size_aware_shells=False, lambda_composition=10.0,
-              balance_headroom=1.2,
+              balance_headroom=2.0,
               max_size7_share=None, max_mtwp17_share=None,
               min_admitted_households=0, shell_growth=False,
               family_clone=False):
@@ -1242,7 +1242,7 @@ def main():
     ap.add_argument("--time-limit", type=float, default=30.0)
     ap.add_argument("--lambda-composition", type=float, default=10.0,
                     help="weight on the marginal-deviation term")
-    ap.add_argument("--balance-headroom", type=float, default=1.2,
+    ap.add_argument("--balance-headroom", type=float, default=2.0,
                     help="allow up to this multiple of the carrier-minimum "
                          "household budget for marginal balancing")
     ap.add_argument("--zones-limit", type=int, default=None)
