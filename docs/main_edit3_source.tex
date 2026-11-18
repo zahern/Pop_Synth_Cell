@@ -452,7 +452,12 @@ better.}
 control tables: it expresses each stage's TVD as a percentage of the maximum
 TVD attainable against the same census marginal, so tables with different
 category counts and minimum shares are comparable. A value of 0\% is a perfect
-fit and 100\% is the worst possible fit; lower is better.
+fit and 100\% is the worst possible fit; lower is better. The side columns show
+where the carrier stage has real work to do: relationship in household and
+student status carry 6.8\% and 5.3\% of their target mass in zero-capacity
+cells, whereas field of study has more zero cells (681) but only 0.3\% of its
+target mass. That is why the carrier column moves the first two tables more
+than the last.
 
 \begin{figure}[H]
 \centering
@@ -463,8 +468,11 @@ all 19 control tables. Cell values are the stage TVD as a percentage of the
 maximum TVD attainable against that table's census marginal,
 $100\times \mathrm{TVD}/(1-\min_m q_{z,k,m})$, averaged over zones: 0\% is a
 perfect fit and 100\% is the worst possible fit for that marginal. Lower is
-better. The final column is the pool with constructed carriers; comparing it
-with the CP column shows which tables the carrier stage improves or worsens.}
+better. The right-hand columns give the share of the table's census target that
+sits in zero-capacity cells---the part the carrier stage has to add rather than
+reweight---and the number of such cells. The final pool column includes the
+constructed carriers; comparing it with the CP column shows which tables the
+carrier stage improves or worsens.}
 \label{fig:pool_stage_heatmap}
 \end{figure}
 
