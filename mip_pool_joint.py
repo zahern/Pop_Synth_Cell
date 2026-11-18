@@ -19,7 +19,11 @@ moves the decision to one selection program per zone:
 with nu_c = ceil(E_{z,k,m} / rep_max) and K_z = sum_c nu_c: the number of
 distinct carrier contributions is set by the cell target, not by a fixed budget.
 A post-selection swap pass enforces the same balance criterion when the solver
-returns an incumbent or the coverage-first greedy fallback is used.
+returns an incumbent or the coverage-first greedy fallback is used.  The
+released defaults are lambda_0=1e5, lambda_c=10 and lambda_1=1e-4; the household
+budget carries a 1.2 headroom above the carrier minimum so the balance term can
+admit additional households when they bring the added set closer to the zone's
+marginal composition.
 
 Every deviation is computed from the same x for every control table, so the
 selected agents are fitted to the zone's marginal composition jointly rather
@@ -465,7 +469,7 @@ def _deviation_terms(A, T, cells, sizes, hh_attr_set):
 
 def solve_selection(C, T, sizes, cells, zero_mask, shell_ids, hh_attr_set,
                     max_households=64, max_persons=256, time_limit=30.0,
-                    zero_need=None, lambda_composition=1.0,
+                    zero_need=None, lambda_composition=10.0,
                     max_size7_share=None, max_mtwp17_share=None,
                     min_admitted_households=0):
     """Solve the joint-marginal selection program for one zone.
@@ -501,7 +505,7 @@ def solve_selection(C, T, sizes, cells, zero_mask, shell_ids, hh_attr_set,
     # the program infeasible, but the marginal-derived budget no longer binds
     # below what sourceable cells require.
     lam_cov = 1e5
-    lam_card = 1e-2     # mild parsimony pressure
+    lam_card = 1e-4     # weak parsimony: balance may admit extra households
     n = n_cand + n_zero + n_cells
     c_obj = np.zeros(n)
     c_obj[:n_cand] = lam_card
@@ -712,7 +716,8 @@ def run_joint(pool_path, census_path, rep_max, out_path,
               donors_per_cell=4, time_limit=30.0, seed=0, zones_file=None,
               allow_global_donors=True, append_menu_candidates=True,
               append_only=False, id_offset=0, include_partial_deficits=False,
-              size_aware_shells=False, lambda_composition=1.0,
+              size_aware_shells=False, lambda_composition=10.0,
+              balance_headroom=1.2,
               max_size7_share=None, max_mtwp17_share=None,
               min_admitted_households=0, shell_growth=False,
               family_clone=False):
@@ -933,6 +938,15 @@ def run_joint(pool_path, census_path, rep_max, out_path,
                 [gap_by_cell[c] for c in zero_cells], rep_max,
                 max_households=max_new_households,
                 max_persons=max_new_persons)
+            # Balance headroom: the carrier requirement is the floor, but the
+            # balance term may admit additional households to bring the added
+            # set closer to the zone's marginal composition.
+            if np.isfinite(zone_max_households):
+                zone_max_households = int(np.ceil(
+                    zone_max_households * max(1.0, balance_headroom)))
+            if np.isfinite(zone_max_persons):
+                zone_max_persons = int(np.ceil(
+                    zone_max_persons * max(1.0, balance_headroom)))
             if min_admitted_households > zone_max_households:
                 zone_max_households = int(min_admitted_households)
                 zone_max_persons = max(zone_max_persons,
@@ -1226,6 +1240,11 @@ def main():
                     help="Append only the households selected by the "
                          "coverage/marginal program.")
     ap.add_argument("--time-limit", type=float, default=30.0)
+    ap.add_argument("--lambda-composition", type=float, default=10.0,
+                    help="weight on the marginal-deviation term")
+    ap.add_argument("--balance-headroom", type=float, default=1.2,
+                    help="allow up to this multiple of the carrier-minimum "
+                         "household budget for marginal balancing")
     ap.add_argument("--zones-limit", type=int, default=None)
     ap.add_argument("--zones-file", default=None,
                     help="optional file of zone IDs to audit (one per line)")
@@ -1248,7 +1267,9 @@ def main():
         seed=a.seed, zones_file=a.zones_file,
         allow_global_donors=(a.donor_policy == "global"),
         append_menu_candidates=a.append_menu,
-        append_only=a.append_only, id_offset=a.id_offset)
+        append_only=a.append_only, id_offset=a.id_offset,
+        lambda_composition=a.lambda_composition,
+        balance_headroom=a.balance_headroom)
 
 
 if __name__ == "__main__":
