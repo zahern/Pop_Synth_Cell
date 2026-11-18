@@ -25,6 +25,7 @@ RAW = r"Z:\Population_Synth\LINKED_DATA_clean_hhts_qalfp.csv"
 CP = r"Z:\Paper_Plan\runs\2026-11-11_canonical\pools\feasible_pool.csv"
 MIP = r"Z:\Paper_Plan\runs\2026-11-13_v8\pools\feasible_pool_expanded_released_hhts.csv"
 FB = r"Z:\Paper_Plan\runs\2026-11-13_v8\pools\fallback_carriers.csv"
+BAL = r"Z:\Paper_Plan\runs\2026-11-13_v8\pools\feasible_pool_balanced_hpc.csv"
 CTRL = os.path.join(SYNTH, "data_sa2_controls_v8")
 CSF = os.path.join(SYNTH, "csf_sa.csv")
 ZONES = os.path.join(HERE, "tables", "arm_zones.csv")
@@ -94,16 +95,19 @@ def main() -> None:
     cp = read_subset(CP)
     mip = read_subset(MIP)
     fb = read_subset(FB)
+    bal = read_subset(BAL)
 
     raw["regucp"] = raw.regucp.astype(str).str.zfill(2)
     cp["regucp"] = cp.regucp.astype(str).str.zfill(2)
     mip["regucp"] = mip.regucp.astype(str).str.zfill(2)
     fb["_target_sa2"] = fb._target_sa2.astype(str).str.zfill(9)
+    bal["_target_sa2"] = bal._target_sa2.astype(str).str.zfill(9)
 
     raw_by = {r: g for r, g in raw.groupby("regucp")}
     cp_by = {r: g for r, g in cp.groupby("regucp")}
     mip_by = {r: g for r, g in mip.groupby("regucp")}
     fb_by = {z: g for z, g in fb.groupby("_target_sa2")}
+    bal_by = {z: g for z, g in bal.groupby("_target_sa2")}
 
     # per-SA4 counts
     raw_c = {r: {t: counts(g, t, t in HH) for t, _h in TABLES}
@@ -114,6 +118,8 @@ def main() -> None:
              for r, g in mip_by.items()}
     fb_c = {z: {t: counts(g, t, t in HH) for t, _h in TABLES}
             for z, g in fb_by.items()}
+    bal_c = {z: {t: counts(g, t, t in HH) for t, _h in TABLES}
+             for z, g in bal_by.items()}
 
     tgt = targets()
     geo = pd.read_csv(os.path.join(SYNTH, "sa2_zones_reference_357.csv"),
@@ -153,12 +159,17 @@ def main() -> None:
                        for k in set(cp_c[sa4][table]) | set(f)}
             mip_plus = {k: mip_c[sa4][table].get(k, 0) + f.get(k, 0)
                         for k in set(mip_c[sa4][table]) | set(f)}
+            bal = bal_c.get(zone, {}).get(table, {})
+            bal_plus = {k: cp_c[sa4][table].get(k, 0) + bal.get(k, 0)
+                        + f.get(k, 0)
+                        for k in set(cp_c[sa4][table]) | set(bal) | set(f)}
             vals = {
                 "Raw": tvd(to_shares(raw_c[sa4][table]), t),
                 "CP": tvd(to_shares(cp_c[sa4][table]), t),
                 "Expanded": tvd(to_shares(mip_c[sa4][table]), t),
                 "CP + fallback": tvd(to_shares(cp_plus), t),
                 "Expanded + fallback": tvd(to_shares(mip_plus), t),
+                "Balanced": tvd(to_shares(bal_plus), t),
             }
             max_tvd = 1.0 - min(v for v in t.values() if v == v)
             rows.append({"zone": zone, "table": table, "max_tvd": max_tvd,
