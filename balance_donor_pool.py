@@ -21,10 +21,23 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mip_fit as mipf  # noqa: E402
 import mip_pool_joint as mj  # noqa: E402
 
-CP = r"Z:\Paper_Plan\runs\2026-11-11_canonical\pools\feasible_pool.csv"
-CENSUS = r"Z:\Population_Synth\LINKED_DATA_clean.csv"
-ZONES = r"Z:\Paper_Plan\synth_pop\pbs\zones_367.txt"
-OUT = r"Z:\Paper_Plan\runs\2026-11-13_v8\pools\balance_donors.csv"
+_WIN = os.name == "nt"
+CP = os.environ.get(
+    "CP_POOL",
+    r"Z:\Paper_Plan\runs\2026-11-11_canonical\pools\feasible_pool.csv"
+    if _WIN else "/home/ahernz/Paper_Plan/runs/2026-11-11_canonical/pools/feasible_pool.csv")
+CENSUS = os.environ.get(
+    "CENSUS_FILE",
+    r"Z:\Population_Synth\LINKED_DATA_clean.csv"
+    if _WIN else "/home/ahernz/Population_Synth/LINKED_DATA_clean.csv")
+ZONES = os.environ.get(
+    "ZONES_FILE",
+    r"Z:\Paper_Plan\synth_pop\pbs\zones_367.txt"
+    if _WIN else "/home/ahernz/Paper_Plan/synth_pop/pbs/zones_367.txt")
+OUT = os.environ.get(
+    "OUT_FILE",
+    r"Z:\Paper_Plan\runs\2026-11-13_v8\pools\balance_donors.csv"
+    if _WIN else "/home/ahernz/Paper_Plan/runs/2026-11-13_v8/pools/balance_donors.csv")
 
 
 def select_zone(cp, census, zone, ind, hh, ind_keys, hh_keys, sa2_to_reg,
