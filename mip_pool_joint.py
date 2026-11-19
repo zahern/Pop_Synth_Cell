@@ -263,6 +263,10 @@ def build_candidate_menu(census, index, cells, reg, global_dom, rlhp_dom,
         if attr_col is None:
             skipped["attr_not_in_census"] += 1
             continue
+        hh_band = (attr_col in legacy._ORDINAL_ATTRS
+                   and attr_col not in legacy._PERSON_ORDINAL_ATTRS)
+        need_here = max(int((cell_need or {}).get((attr, code), 0)),
+                        int(donors_per_cell))
         if (attr, code) in padding:
             skipped["padding_not_applicable"] += 1
             continue
@@ -281,7 +285,8 @@ def build_candidate_menu(census, index, cells, reg, global_dom, rlhp_dom,
             # hours worked, or qualification level) is carried by no record in
             # the local slice, borrow the nearest applicable band and shift the
             # value to the target.  Try local first, then global if allowed.
-            if donors.empty and attr_col in legacy._ORDINAL_ATTRS:
+            if ((donors.empty or (hh_band and len(donors) < need_here * 2))
+                    and attr_col in legacy._ORDINAL_ATTRS):
                 special = legacy._ORDINAL_SPECIAL.get(attr_col, set())
                 if code not in special:
                     nb = legacy._nearest_ordinal_donors(
@@ -291,6 +296,9 @@ def build_candidate_menu(census, index, cells, reg, global_dom, rlhp_dom,
                             census, attr_col, code, special)
                     if nb is not None and not nb.empty:
                         donors = nb.copy()
+                        # Dwelling bands are household-wide: set the value on
+                        # every member row, then let the verbatim transplant
+                        # validate the whole household.
                         donors[attr_col] = code
                         shifted = True
             donor_cache[key] = donors
@@ -320,9 +328,7 @@ def build_candidate_menu(census, index, cells, reg, global_dom, rlhp_dom,
                     donors = filtered
 
         made = 0
-        need_here = max(int((cell_need or {}).get((attr, code), 0)),
-                        int(donors_per_cell))
-        if len(donors):
+        if len(donors) and not hh_band:
             n_take = min(max(int(donors_per_cell), need_here), len(donors))
             salt = zlib.crc32(f"{reg}:{attr}:{code}".encode("utf-8"))
             sample = donors.sample(
@@ -416,7 +422,8 @@ def _table_shares(cells, T):
     return q, counts
 
 
-def _selection_stats(x, A, B, w, zero_mask, sizes, zero_need=None):
+def _selection_stats(x, A, B, w, zero_mask, sizes, zero_need=None,
+                     offset=None):
     x = np.asarray(x, dtype=float)
     zero_mask = np.asarray(zero_mask, dtype=bool)
     sel = np.flatnonzero(x > 0)
@@ -430,7 +437,8 @@ def _selection_stats(x, A, B, w, zero_mask, sizes, zero_need=None):
         requirement = np.ones(int(zero_mask.sum()), dtype=float)
     else:
         requirement = np.asarray(zero_need, dtype=float)
-    dev = np.abs(B.T.dot(x))
+    off = np.zeros(B.shape[1], dtype=float) if offset is None else np.asarray(offset, dtype=float)
+    dev = np.abs(off + B.T.dot(x))
     return {
         "n_selected_households": int(len(sel)),
         "n_selected_persons": int(float(np.dot(np.asarray(sizes, dtype=float), x))),
@@ -447,31 +455,35 @@ def _selection_stats(x, A, B, w, zero_mask, sizes, zero_need=None):
     }
 
 
-def _deviation_terms(A, T, cells, sizes, hh_attr_set):
-    """Return the share-deviation matrix B and its table-normalised weights."""
-    q, counts = _table_shares(cells, T)
+def _deviation_terms(A, T, cells, sizes, hh_attr_set, base=None):
+    """Return additive count matrix B, weights w, and base--target offset.
+
+    The deviation is measured on the *final* pool, not on the added set alone:
+    ``offset + B.T @ x`` is the final cell count minus the census target.  This
+    is what lets the expansion correct an imbalance already present in the base
+    pool instead of merely choosing an added set that looks representative on
+    its own.
+    """
+    _, counts = _table_shares(cells, T)
     B = A.copy()
-    is_hh = np.array([c[0] in hh_attr_set for c in cells], dtype=bool)
-    sizes = np.asarray(sizes, dtype=float)
-    for i in range(len(cells)):
-        if is_hh[i]:
-            B[:, i] -= q[i]
-        else:
-            B[:, i] -= q[i] * sizes
 
     # Table-normalised relative weights: every control table contributes
     # equally, and large person tables do not drown the smaller ones.
     w = np.array([1.0 / (counts[c[0]] * max(float(T[i]), 1.0))
                   for i, c in enumerate(cells)], dtype=float)
     w = w / max(float(w.max()), 1e-12)
-    return B, w
+    if base is None:
+        offset = np.zeros(len(T), dtype=float)
+    else:
+        offset = np.asarray(base, dtype=float) - np.asarray(T, dtype=float)
+    return B, w, offset
 
 
 def solve_selection(C, T, sizes, cells, zero_mask, shell_ids, hh_attr_set,
                     max_households=64, max_persons=256, time_limit=30.0,
                     zero_need=None, lambda_composition=10.0,
                     max_size7_share=None, max_mtwp17_share=None,
-                    min_admitted_households=0):
+                    min_admitted_households=0, base=None):
     """Solve the joint-marginal selection program for one zone.
 
     Returns (x, stats).  x is a 0/1 vector aligned to C's columns, or None if
@@ -496,7 +508,8 @@ def solve_selection(C, T, sizes, cells, zero_mask, shell_ids, hh_attr_set,
         raise ValueError("zero_need must align with the zero-capacity cells")
 
     A = C.T.toarray().astype(float)
-    B, w = _deviation_terms(A, T, cells, sizes, hh_attr_set)
+    B, w, offset = _deviation_terms(A, T, cells, sizes, hh_attr_set,
+                                    base=base)
 
     # The marginal term is bounded by the selected person count times the
     # number of cells, so 1e5 per unit of coverage makes meeting a zero cell's
@@ -505,7 +518,7 @@ def solve_selection(C, T, sizes, cells, zero_mask, shell_ids, hh_attr_set,
     # the program infeasible, but the marginal-derived budget no longer binds
     # below what sourceable cells require.
     lam_cov = 1e5
-    lam_card = 1e-4     # weak parsimony: balance may admit extra households
+    lam_card = 1e-6     # very weak parsimony: balance may admit extra households
     n = n_cand + n_zero + n_cells
     c_obj = np.zeros(n)
     c_obj[:n_cand] = lam_card
@@ -532,11 +545,11 @@ def solve_selection(C, T, sizes, cells, zero_mask, shell_ids, hh_attr_set,
         row = np.zeros(n)
         row[:n_cand] = B[:, i]
         row[n_cand + n_zero + i] = -1.0
-        add(row, -np.inf, 0.0)
+        add(row, -np.inf, -float(offset[i]))
         row = np.zeros(n)
         row[:n_cand] = -B[:, i]
         row[n_cand + n_zero + i] = -1.0
-        add(row, -np.inf, 0.0)
+        add(row, -np.inf, float(offset[i]))
 
     row = np.zeros(n)
     row[:n_cand] = 1.0
@@ -595,7 +608,7 @@ def solve_selection(C, T, sizes, cells, zero_mask, shell_ids, hh_attr_set,
         return None, {"solver": "failed"}
     x = np.rint(np.asarray(res.x[:n_cand])).astype(int)
     stats = _selection_stats(x, A, B, w, zero_mask, sizes,
-                             zero_need=zero_need)
+                             zero_need=zero_need, offset=offset)
     stats["solver"] = "optimal" if getattr(res, "success", False) else "incumbent"
     fun = getattr(res, "fun", None)
     stats["objective"] = float(fun) if fun is not None else float("nan")
@@ -657,7 +670,7 @@ def greedy_selection(A, sizes, zero_mask, max_households=64,
 
 
 def balance_swaps(x, A, B, w, zero_mask, zero_need=None, shell_ids=None,
-                  max_iters=5):
+                  max_iters=5, offset=None):
     """Improve marginal balance without losing zero-cell coverage.
 
     The joint MIP already carries a marginal-deviation term, but a solver
@@ -674,13 +687,15 @@ def balance_swaps(x, A, B, w, zero_mask, zero_need=None, shell_ids=None,
                    else np.asarray(zero_need, dtype=float))
     if shell_ids is None:
         shell_ids = [None] * len(x)
+    off = (np.zeros(B.shape[1], dtype=float) if offset is None
+           else np.asarray(offset, dtype=float))
 
     for _ in range(max_iters):
         selected = np.flatnonzero(x > 0)
         unselected = np.flatnonzero(x == 0)
         if not len(selected) or not len(unselected):
             break
-        v = B.T.dot(x)
+        v = off + B.T.dot(x)
         current = float(np.dot(w, np.abs(v)))
         contribution = A.T.dot(x)
         used_shells = {shell_ids[j] for j in selected
@@ -705,6 +720,90 @@ def balance_swaps(x, A, B, w, zero_mask, zero_need=None, shell_ids=None,
     return x
 
 
+def balance_add(x, A, B, w, offset, sizes, shell_ids=None,
+                max_households=64, max_persons=256, max_iters=500):
+    """Add carriers while they reduce the final-pool marginal deviation.
+
+    The MIP may stop at a coverage-feasible incumbent before it has explored
+    the balance candidates, and the swap pass cannot increase the selected set.
+    This pass starts from the coverage set and adds the best unselected
+    candidate repeatedly, subject to the household/person budget and the
+    one-carrier-per-shell rule.
+    """
+    x = np.asarray(x, dtype=float).copy()
+    if shell_ids is None:
+        shell_ids = [None] * len(x)
+    used_shells = {shell_ids[j] for j in np.flatnonzero(x > 0)
+                   if shell_ids[j] is not None}
+    persons = float(np.dot(np.asarray(sizes, dtype=float), x))
+    households = int(np.sum(x > 0))
+    v = offset + B.T.dot(x)
+    current = float(np.dot(w, np.abs(v)))
+
+    for _ in range(max_iters):
+        best_obj, best_j = current, None
+        for j in np.flatnonzero(x == 0):
+            shell = shell_ids[j]
+            if shell is not None and shell in used_shells:
+                continue
+            if households + 1 > max_households:
+                break
+            if persons + float(sizes[j]) > max_persons:
+                continue
+            obj = float(np.dot(w, np.abs(v + B[j])))
+            if obj < best_obj - 1e-12:
+                best_obj, best_j = obj, j
+        if best_j is None:
+            # No single household improves the final deviation.  Try pairs:
+            # a household that fixes one cell can worsen another, while a pair
+            # from different underrepresented cells can compensate.
+            cand = []
+            for j in np.flatnonzero(x == 0):
+                shell = shell_ids[j]
+                if shell is not None and shell in used_shells:
+                    continue
+                if persons + float(sizes[j]) > max_persons:
+                    continue
+                delta = float(np.dot(w, np.abs(v + B[j]))) - current
+                cand.append((delta, j))
+            cand.sort()
+            cand = [j for _d, j in cand[:80]]
+            best_pair_obj, best_pair = current, None
+            for a in range(len(cand)):
+                j = cand[a]
+                for b in range(a + 1, len(cand)):
+                    k = cand[b]
+                    if households + 2 > max_households:
+                        continue
+                    if persons + float(sizes[j]) + float(sizes[k]) > max_persons:
+                        continue
+                    sj, sk = shell_ids[j], shell_ids[k]
+                    if sj is not None and sk is not None and sj == sk:
+                        continue
+                    obj = float(np.dot(w, np.abs(v + B[j] + B[k])))
+                    if obj < best_pair_obj - 1e-12:
+                        best_pair_obj, best_pair = obj, (j, k)
+            if best_pair is None:
+                break
+            for j in best_pair:
+                x[j] = 1.0
+                v = v + B[j]
+                households += 1
+                persons += float(sizes[j])
+                if shell_ids[j] is not None:
+                    used_shells.add(shell_ids[j])
+            current = best_pair_obj
+            continue
+        x[best_j] = 1.0
+        v = v + B[best_j]
+        current = best_obj
+        households += 1
+        persons += float(sizes[best_j])
+        if shell_ids[best_j] is not None:
+            used_shells.add(shell_ids[best_j])
+    return x
+
+
 # ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
@@ -718,6 +817,7 @@ def run_joint(pool_path, census_path, rep_max, out_path,
               append_only=False, id_offset=0, include_partial_deficits=False,
               size_aware_shells=False, lambda_composition=10.0,
               balance_headroom=2.0,
+              balance_gap_fraction=0.0, max_balance_cells=40,
               max_size7_share=None, max_mtwp17_share=None,
               min_admitted_households=0, shell_growth=False,
               family_clone=False):
@@ -750,6 +850,8 @@ def run_joint(pool_path, census_path, rep_max, out_path,
         "append_menu_candidates": bool(append_menu_candidates),
         "append_only": bool(append_only),
         "include_partial_deficits": bool(include_partial_deficits),
+        "balance_gap_fraction": float(balance_gap_fraction),
+        "max_balance_cells": int(max_balance_cells),
         "size_aware_shells": bool(size_aware_shells),
         "shell_growth": bool(shell_growth),
         "family_clone": bool(family_clone),
@@ -776,6 +878,17 @@ def run_joint(pool_path, census_path, rep_max, out_path,
         census_kw["nrows"] = int(census_nrows)
     pool = pd.read_csv(pool_path, **pool_kw)
     census = pd.read_csv(census_path, **census_kw)
+    # The fused census carries the 15-code QALFP domain; the control tables use
+    # the 16-code domain (the modal category is 14 vs 15).  Shift the three
+    # supplementary codes before any donor construction so a constructed
+    # field-of-study donor actually lands in the requested cell.
+    qalfp_col = next((c for c in census.columns
+                      if str(c).lower() == "qalfp"), None)
+    if qalfp_col is not None:
+        census[qalfp_col] = pd.to_numeric(
+            census[qalfp_col], errors="coerce").replace(
+                {12: 13, 13: 14, 14: 15})
+        report["qalfp_crosswalk"] = "12->13,13->14,14->15"
     report["n_pool_rows"] = int(len(pool))
     report["n_census_rows"] = int(len(census))
 
@@ -905,6 +1018,7 @@ def run_joint(pool_path, census_path, rep_max, out_path,
                 cand, targets, ind_keys, hh_keys)
             T = np.array([targets[c] for c in cells], dtype=float)
             capacity = rep_max * np.asarray(C_pool.sum(axis=1)).ravel()
+            base_counts = np.asarray(C_pool.sum(axis=1)).ravel()
             if include_partial_deficits:
                 zero_mask = (T > 0) & (capacity < T)
             else:
@@ -958,12 +1072,60 @@ def run_joint(pool_path, census_path, rep_max, out_path,
                 c: legacy.households_to_cover(gap_by_cell[c], rep_max)
                 for c in zero_cells}
 
+            # Marginal-gap track: add candidates for categories that are
+            # underrepresented in the *final* pool, even when they already
+            # have some capacity.  This gives the balance term a lever over
+            # the common-category gaps that zero-cell coverage cannot touch.
+            balance_cells = []
+            balance_need = {}
+            if balance_gap_fraction > 0:
+                base_by = defaultdict(float)
+                target_by = defaultdict(float)
+                for i, (attr, _code) in enumerate(cells):
+                    base_by[attr] += float(base_counts[i])
+                    target_by[attr] += float(T[i])
+                gaps = []
+                for i, (attr, code) in enumerate(cells):
+                    if isinstance(code, (set, frozenset, list, tuple)):
+                        continue
+                    if target_by[attr] <= 0 or base_by[attr] <= 0:
+                        continue
+                    gap = (float(T[i]) / target_by[attr]
+                           - float(base_counts[i]) / base_by[attr])
+                    if gap > 0.005:
+                        gaps.append((gap * float(T[i]), gap, (attr, code), i))
+                gaps.sort(reverse=True)
+                for _score, gap, cell, i in gaps[:int(max_balance_cells)]:
+                    if cell in zero_set:
+                        continue
+                    balance_cells.append(cell)
+                    balance_need[cell] = max(
+                        1, min(12, int(np.ceil(
+                            gap * float(T[i]) / max(1, int(rep_max))))))
+
+                # A person budget proportional to the zone, not to the carrier
+                # minimum.  The default budget still needs to be set; this is
+                # the lever that makes dilution possible.
+                person_totals = [
+                    sum(float(v) for (a, _c), v in targets.items()
+                        if str(a).lower() == name)
+                    for name in ("sexp", "agep")]
+                zone_persons = max(person_totals or [0.0])
+                if zone_persons > 0:
+                    bp = int(round(balance_gap_fraction * zone_persons))
+                    zone_max_persons += bp
+                    zone_max_households += int(np.ceil(bp / 2.5))
+
+            menu_cells = list(zero_cells) + balance_cells
+            menu_need = dict(need_by_cell)
+            menu_need.update(balance_need)
+
             blocks, meta, skipped = build_candidate_menu(
-                census, index, zero_cells, reg, global_dom, rlhp_dom,
+                census, index, menu_cells, reg, global_dom, rlhp_dom,
                 cuts, seed=seed, donors_per_cell=donors_per_cell,
                 shells_per_cell=shells_per_cell,
                 allow_global_donors=allow_global_donors,
-                cell_need=need_by_cell, size_preference=size_preference,
+                cell_need=menu_need, size_preference=size_preference,
                 shell_growth=shell_growth, family_clone=family_clone)
             for k, v in skipped.items():
                 skipped_all[k] += int(v)
@@ -982,6 +1144,8 @@ def run_joint(pool_path, census_path, rep_max, out_path,
                                   if max_new_households is None
                                   else "fixed"),
                 "marginal_household_requirement": int(zone_need),
+                "n_balance_cells": int(len(balance_cells)),
+                "balance_cells": [f"{a}:{c}" for a, c in balance_cells],
                 "budget_households": int(zone_max_households),
                 "budget_persons": int(zone_max_persons),
             }
@@ -1015,6 +1179,9 @@ def run_joint(pool_path, census_path, rep_max, out_path,
             zero_need_cand = np.array(
                 [need_by_cell[c] for c in cells_cand if c in zero_set],
                 dtype=float)
+            base_cand = np.array(
+                [base_counts[cell_pos[c]] if c in cell_pos else 0.0
+                 for c in cells_cand], dtype=float)
             if len(hh_ids_cand) == len(meta):
                 shell_ids = [m.get("shell") for m in meta]
             else:
@@ -1028,12 +1195,14 @@ def run_joint(pool_path, census_path, rep_max, out_path,
                 lambda_composition=lambda_composition,
                 max_size7_share=max_size7_share,
                 max_mtwp17_share=max_mtwp17_share,
-                min_admitted_households=min_admitted_households)
+                min_admitted_households=min_admitted_households,
+                base=base_cand)
             if x is None:
                 used_greedy = True
                 A = C_cand.T.toarray().astype(float)
-                B, w = _deviation_terms(
-                    A, T_cand, cells_cand, sizes, hh_attr_set)
+                B, w, offset = _deviation_terms(
+                    A, T_cand, cells_cand, sizes, hh_attr_set,
+                    base=base_cand)
                 x = greedy_selection(
                     A, sizes, zero_mask_cand,
                     max_households=zone_max_households,
@@ -1044,16 +1213,20 @@ def run_joint(pool_path, census_path, rep_max, out_path,
 
             # Enforce the balance criterion after either path: coverage is
             # held fixed while the selected set is swapped toward the zone's
-            # marginal composition.
+            # final marginal composition.
             A = C_cand.T.toarray().astype(float)
-            B, w = _deviation_terms(
-                A, T_cand, cells_cand, sizes, hh_attr_set)
+            B, w, offset = _deviation_terms(
+                A, T_cand, cells_cand, sizes, hh_attr_set, base=base_cand)
             x = balance_swaps(
                 x, A, B, w, zero_mask_cand, zero_need=zero_need_cand,
-                shell_ids=shell_ids)
+                shell_ids=shell_ids, offset=offset)
+            x = balance_add(
+                x, A, B, w, offset, sizes, shell_ids=shell_ids,
+                max_households=zone_max_households,
+                max_persons=zone_max_persons)
             stats = _selection_stats(
                 x, A, B, w, zero_mask_cand, sizes,
-                zero_need=zero_need_cand)
+                zero_need=zero_need_cand, offset=offset)
             if used_greedy:
                 stats["solver"] = "greedy+balance"
 
@@ -1239,12 +1412,23 @@ def main():
                     action="store_false",
                     help="Append only the households selected by the "
                          "coverage/marginal program.")
+    ap.add_argument("--include-partial-deficits", action="store_true",
+                    default=False,
+                    help="Also treat cells whose capacity is below target as "
+                         "expansion targets, not only zero-capacity cells.")
     ap.add_argument("--time-limit", type=float, default=30.0)
     ap.add_argument("--lambda-composition", type=float, default=10.0,
                     help="weight on the marginal-deviation term")
     ap.add_argument("--balance-headroom", type=float, default=2.0,
                     help="allow up to this multiple of the carrier-minimum "
                          "household budget for marginal balancing")
+    ap.add_argument("--balance-gap-fraction", type=float, default=0.0,
+                    help="add a marginal-gap budget of this fraction of zone "
+                         "persons and construct candidates for the largest "
+                         "underrepresented cells")
+    ap.add_argument("--max-balance-cells", type=int, default=40,
+                    help="maximum underrepresented cells per zone for the "
+                         "marginal-gap track")
     ap.add_argument("--zones-limit", type=int, default=None)
     ap.add_argument("--zones-file", default=None,
                     help="optional file of zone IDs to audit (one per line)")
@@ -1269,7 +1453,10 @@ def main():
         append_menu_candidates=a.append_menu,
         append_only=a.append_only, id_offset=a.id_offset,
         lambda_composition=a.lambda_composition,
-        balance_headroom=a.balance_headroom)
+        balance_headroom=a.balance_headroom,
+        balance_gap_fraction=a.balance_gap_fraction,
+        max_balance_cells=a.max_balance_cells,
+        include_partial_deficits=a.include_partial_deficits)
 
 
 if __name__ == "__main__":

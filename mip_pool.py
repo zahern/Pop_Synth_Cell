@@ -1448,8 +1448,16 @@ _ORDINAL_SPECIAL = {
     "HRSP":  {101, 103},   # Not stated, Overseas visitor
     "INCP":  {18, 19},     # Not applicable, Overseas visitor
     "QALLP": {8, 9},       # Not applicable, Overseas
+    # Dwelling bands: the special codes are interleaved in the numeric range
+    # and must never be shifted into or out of.
+    "MRERD": {22, 23},     # Not stated, Not applicable
+    "RNTRD": {26, 27},     # Not stated, Not applicable
+    "VEHRD": {5},          # Not stated
+    "BEDRD": {6},          # Not stated
+    "HIND":  {17, 24, 25},  # Not stated, Not applicable, Overseas
 }
 _ORDINAL_ATTRS = set(_ORDINAL_SPECIAL)
+_PERSON_ORDINAL_ATTRS = {"HRSP", "INCP", "QALLP"}
 _ORDINAL_CHILD_AGE_MAX = 14
 
 # Attributes that the global donor policy sources from the WHOLE census rather
@@ -1472,7 +1480,9 @@ def _nearest_ordinal_donors(census, attr, code, special):
                          if int(c) not in special and int(c) != int(code)})
     if not applicable:
         return None
-    age_ok = census["AGEP"] > _ORDINAL_CHILD_AGE_MAX if "AGEP" in census.columns else None
+    age_ok = (census["AGEP"] > _ORDINAL_CHILD_AGE_MAX
+              if (attr in _PERSON_ORDINAL_ATTRS and "AGEP" in census.columns)
+              else None)
     for c in sorted(applicable, key=lambda v: (abs(v - int(code)), v)):
         mask = census[attr] == c
         if age_ok is not None:

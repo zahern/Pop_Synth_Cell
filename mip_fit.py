@@ -674,13 +674,13 @@ def _achieved_rel_dev(C, T, x):
     return float(np.max(np.abs(got - T) / denom))
 
 
-def drop_inconsistent_households(cand, hh_keys):
-    """Drop candidate households whose members disagree on household attrs.
+def reconcile_inconsistent_households(cand, hh_keys):
+    """Harmonise household attributes to the within-household mode.
 
-    Household-level attributes (bedrooms, composition, vehicles, ...) must be
-    identical for every member of a household; mixed rows are data errors and
-    would make the MIP match a household against two cells at once. Returns
-    (clean_df, n_dropped_households, n_dropped_rows).
+    A household-level attribute (bedrooms, composition, vehicles, ...) must be
+    identical for every member.  Rather than drop the whole household, set each
+    disagreeing attribute to the most common non-null value in that household.
+    Returns (repaired_df, n_repaired_households, n_repaired_rows).
     """
     if "abshid" not in cand.columns:
         return cand, 0, 0
@@ -691,9 +691,91 @@ def drop_inconsistent_households(cand, hh_keys):
     bad_ids = set(nun.index[(nun > 1).any(axis=1)].tolist())
     if not bad_ids:
         return cand, 0, 0
-    keep = ~cand["abshid"].isin(bad_ids)
-    return (cand[keep].reset_index(drop=True), len(bad_ids),
-            int((~keep).sum()))
+    cand = cand.copy()
+    n_rows = 0
+    for hh_id in bad_ids:
+        mask = cand["abshid"] == hh_id
+        for col in hh_cols:
+            values = cand.loc[mask, col].dropna()
+            if values.nunique() <= 1:
+                continue
+            mode = values.mode()
+            if mode.empty:
+                continue
+            cand.loc[mask, col] = mode.iloc[0]
+        n_rows += int(mask.sum())
+    return cand, len(bad_ids), n_rows
+
+
+def shift_household_band(cand, targets, table="strd"):
+    """Reassign a categorical household band to match its target marginal.
+
+    The shift is a permutation of existing households: every member row of a
+    selected household receives the same new code, so the household remains
+    atomic and the row count does not change.  Codes are taken from categories
+    with surplus and given to categories with a deficit.  For ``strd`` code 6
+    (caravan/other), tenure is set to not-applicable only when a household would
+    otherwise carry both rent and mortgage.
+    """
+    table = str(table).lower()
+    if "abshid" not in cand.columns or table not in cand.columns:
+        return cand, 0
+    target = {int(c): float(v) for (a, c), v in targets.items()
+              if str(a).lower() == table and float(v) > 0}
+    if not target:
+        return cand, 0
+    hh = cand.groupby("abshid")[table].first()
+    n_hh = len(hh)
+    if n_hh == 0:
+        return cand, 0
+    total = sum(target.values())
+    target_count = {c: int(round(v / total * n_hh)) for c, v in target.items()}
+    cur = hh.value_counts().to_dict()
+    cur = {int(k): int(v) for k, v in cur.items()}
+    cand = cand.copy()
+    shifted = 0
+    for code in sorted(target_count):
+        need = target_count[code] - cur.get(code, 0)
+        if need <= 0:
+            continue
+        for src in sorted(cur, key=lambda k: -(cur[k] - target_count.get(k, 0))):
+            if src == code:
+                continue
+            surplus = cur[src] - target_count.get(src, 0)
+            if surplus <= 0:
+                continue
+            ids = hh.index[hh == src].tolist()
+            if code == 6:
+                # Prefer households without an active rent+mortgage pair.
+                safe = []
+                for hh_id in ids:
+                    sub = cand[cand["abshid"] == hh_id]
+                    rent = sub.get("rntrd", pd.Series([27])).iloc[0]
+                    mort = sub.get("mrerd", pd.Series([23])).iloc[0]
+                    if rent == 27 or mort == 23:
+                        safe.append(hh_id)
+                ids = safe
+            take = ids[:min(need, surplus, len(ids))]
+            if not take:
+                continue
+            mask = cand["abshid"].isin(take)
+            cand.loc[mask, table] = code
+            if code == 6 and "rntrd" in cand.columns:
+                cand.loc[mask, "rntrd"] = 27
+            if code == 6 and "mrerd" in cand.columns:
+                cand.loc[mask, "mrerd"] = 23
+            cur[src] -= len(take)
+            cur[code] = cur.get(code, 0) + len(take)
+            need -= len(take)
+            shifted += len(take)
+            if need <= 0:
+                break
+    return cand, shifted
+
+
+def drop_inconsistent_households(cand, hh_keys):
+    """Backward-compatible alias: reconcile rather than drop."""
+    return reconcile_inconsistent_households(cand, hh_keys)
 
 
 def fit_zone(pool, targets, ind_keys, hh_keys, tol0=0.05,
@@ -1024,13 +1106,17 @@ def main():
                          "candidate_types_selected": 0, "persons": 0,
                          "solver": "LP relaxation + integerisation" if a.solver == "lp" else "MIP"})
             continue
-        cand, n_bad_hh, n_bad_rows = drop_inconsistent_households(
+        cand, n_bad_hh, n_bad_rows = reconcile_inconsistent_households(
             cand, hh_keys)
         if n_bad_hh:
-            print(f"Zone {zone}: dropped {n_bad_hh} inconsistent households "
+            print(f"Zone {zone}: repaired {n_bad_hh} inconsistent households "
                   f"({n_bad_rows} rows), candidates={how}")
-        audit_base["inconsistent_households_dropped"] = n_bad_hh
-        audit_base["inconsistent_person_rows_dropped"] = n_bad_rows
+        audit_base["inconsistent_households_repaired"] = n_bad_hh
+        audit_base["inconsistent_person_rows_repaired"] = n_bad_rows
+        cand, n_strd_shift = shift_household_band(cand, tgt, "strd")
+        audit_base["strd_households_shifted"] = int(n_strd_shift)
+        if n_strd_shift:
+            print(f"Zone {zone}: shifted STRD on {n_strd_shift} households")
         # Bound the program: person target = largest person-table total.
         _person_totals = {}
         for (attr, _cat), cnt in tgt.items():
