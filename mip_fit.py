@@ -139,6 +139,28 @@ _BAND_CELLS = {
 # the keys coming from control tables.
 _HOUSEHOLD_POOL_COLS = {"families_in_household"}
 
+# Relationship-in-household (RLHP) role codes.  The pool and the control tables
+# share this coding: 1 partner, 2 lone parent, 3 child under 15, 4 dependent
+# student, 5 non-dependent child, 6 other related, 7 non-family member,
+# 9 non-classifiable/visitor, 10 not applicable, 11 overseas visitor.
+RLHP_PARTNER = 1
+RLHP_LONE_PARENT = 2
+RLHP_CHILD_UNDER_15 = 3
+RLHP_DEPENDENT_STUDENT = 4
+RLHP_NON_DEPENDENT_CHILD = 5
+RLHP_OTHER_RELATED = 6
+RLHP_NON_FAMILY = 7
+RLHP_NOT_CLASSIFIABLE = 9
+RLHP_NOT_APPLICABLE = 10
+RLHP_OVERSEAS_VISITOR = 11
+
+# Under-15s may only carry these roles (matches constraint_rules.RLHP_CHILD_VALID).
+_RLHP_CHILD_VALID = (RLHP_CHILD_UNDER_15, RLHP_NOT_CLASSIFIABLE,
+                     RLHP_NOT_APPLICABLE, RLHP_OVERSEAS_VISITOR)
+_RLHP_ADULT_AGE = 18
+_RLHP_DEPENDENT_STUDENT_MAX_AGE = 29
+
+
 
 def _band_cell(attr, raw, code):
     """Return (pool_col, frozenset(codes)) for band-coded categories, else None."""
@@ -787,6 +809,380 @@ def drop_inconsistent_households(cand, hh_keys):
     return reconcile_inconsistent_households(cand, hh_keys)
 
 
+def _rlhp_target_shares(targets):
+    """Target RLHP shares from a zone target dict, or {} when absent."""
+    counts = {int(c): float(v) for (a, c), v in targets.items()
+              if str(a).lower() == "rlhp" and float(v) > 0}
+    total = sum(counts.values())
+    return {k: v / total for k, v in counts.items()} if total > 0 else {}
+
+
+def _rlhp_tvd_values(role, share):
+    """Total-variation distance between observed roles and target shares."""
+    if not share or len(role) == 0:
+        return float("nan")
+    n = float(len(role))
+    cur = role.value_counts().to_dict()
+    return 0.5 * sum(abs(cur.get(k, 0) / n - share.get(k, 0))
+                     for k in set(cur) | set(share))
+
+
+def rlhp_structure_violations(cand):
+    """Count household- and person-level relationship-role violations.
+
+    A valid household has zero or two partners, at most one lone parent, a
+    child only in a child-valid role, and every lone parent/child household
+    anchored by an adult.  The counts are diagnostics, not a filter: the repair
+    uses them before and after the role pass.
+    """
+    out = {}
+    if "abshid" not in cand.columns or "rlhp" not in cand.columns:
+        return out
+    role = pd.to_numeric(cand["rlhp"], errors="coerce").fillna(0).astype(int)
+    age = (pd.to_numeric(cand["agep"], errors="coerce").fillna(-1)
+           if "agep" in cand.columns else pd.Series(-1, index=cand.index))
+    hh = cand["abshid"]
+    g = cand.groupby("abshid", sort=False)
+    size = g["abshid"].transform("size")
+    partner_count = (role == RLHP_PARTNER).groupby(hh).transform("sum")
+    lone_count = (role == RLHP_LONE_PARENT).groupby(hh).transform("sum")
+    has_child = ((age < 15) | role.isin([RLHP_CHILD_UNDER_15,
+                                         RLHP_DEPENDENT_STUDENT,
+                                         RLHP_NON_DEPENDENT_CHILD])
+                 ).groupby(hh).transform("any")
+    has_parent = role.isin([RLHP_PARTNER, RLHP_LONE_PARENT]
+                           ).groupby(hh).transform("any")
+    has_adult = (age >= _RLHP_ADULT_AGE).groupby(hh).transform("any")
+    one = size == 1
+    hh_partner = pd.Series(partner_count.to_numpy(), index=hh)
+    hh_lone = pd.Series(lone_count.to_numpy(), index=hh)
+    hh_child = pd.Series(has_child.to_numpy(), index=hh)
+    hh_parent = pd.Series(has_parent.to_numpy(), index=hh)
+    hh_adult = pd.Series(has_adult.to_numpy(), index=hh)
+    out["one_person_wrong_role"] = int(
+        (one & (role != RLHP_NON_FAMILY) & (age >= _RLHP_ADULT_AGE)).sum())
+    out["one_person_child"] = int((one & (age < _RLHP_ADULT_AGE)).sum())
+    out["odd_partner_households"] = int(
+        hh_partner[(hh_partner % 2 == 1)].index.nunique())
+    out["more_than_two_partners"] = int(
+        hh_partner[hh_partner > 2].index.nunique())
+    out["lone_parent_without_child"] = int(
+        hh_lone[(hh_lone > 0) & (~hh_child)].index.nunique())
+    out["child_household_without_parent"] = int(
+        hh_child[(hh_child) & (~hh_parent)].index.nunique())
+    out["child_household_without_adult"] = int(
+        hh_child[(hh_child) & (~hh_adult)].index.nunique())
+    out["under15_invalid_role"] = int(
+        ((age < 15) & (~role.isin(_RLHP_CHILD_VALID))).sum())
+    out["dependent_student_out_of_age"] = int(
+        ((role == RLHP_DEPENDENT_STUDENT)
+         & ((age < 15) | (age > _RLHP_DEPENDENT_STUDENT_MAX_AGE))).sum())
+    out["dependent_student_without_parent"] = int(
+        ((role == RLHP_DEPENDENT_STUDENT) & (~has_parent)).sum())
+    out["non_dependent_child_without_parent"] = int(
+        ((role == RLHP_NON_DEPENDENT_CHILD) & (~has_parent)).sum())
+    return out
+
+
+def repair_rlhp_structure(cand, targets, max_promotions=None):
+    """Repair relationship-in-household roles to make every household coherent.
+
+    The pass is deliberately structural rather than a free band shift:
+
+    * under-15s keep a child-valid role and are never made a partner/parent;
+    * a household keeps at most one couple (two partners), and surplus partner
+      roles become a non-dependent child, other relative or non-family member;
+    * a lone parent is kept only where a child remains, and a child household
+      without a parent is anchored by its oldest adult relative;
+    * dependent students and non-dependent children are retained only where a
+      parent remains in the household;
+    * students aged 15--24 living with a parent are promoted to dependent
+      student only up to the zone's remaining deficit, never beyond it.
+
+    The fallback role for a removed partner is chosen against the zone targets:
+    ``6`` (other related) is used first when that cell is short, otherwise
+    ``7`` (non-family).  The function returns the repaired frame and a report
+    with the operation counts, target gaps and before/after violation counts.
+    """
+    if ("abshid" not in cand.columns or "rlhp" not in cand.columns
+            or "agep" not in cand.columns):
+        return cand, {}
+    share = _rlhp_target_shares(targets)
+    if not share:
+        return cand, {}
+
+    c = cand.reset_index(drop=True).copy()
+    c["rlhp"] = pd.to_numeric(c["rlhp"], errors="coerce").fillna(0).astype(int)
+    c["agep"] = pd.to_numeric(c["agep"], errors="coerce").fillna(-1).astype(int)
+    n_persons = len(c)
+    tgt_n = {k: v * n_persons for k, v in share.items()}
+
+    def need(code):
+        return tgt_n.get(code, 0.0) - float((c["rlhp"] == code).sum())
+
+    before = rlhp_structure_violations(c)
+    tvd_before = _rlhp_tvd_values(c["rlhp"], share)
+    hh_share = {k: v for k, v in share.items()
+                if k not in (RLHP_NOT_CLASSIFIABLE, RLHP_NOT_APPLICABLE,
+                             RLHP_OVERSEAS_VISITOR)}
+    hh_total = sum(hh_share.values())
+    hh_share = ({k: v / hh_total for k, v in hh_share.items()}
+                if hh_total > 0 else {})
+    role7 = c["rlhp"].where(c["rlhp"].isin(hh_share))
+    tvd_hh_before = _rlhp_tvd_values(role7.dropna(), hh_share)
+
+    ops = {}
+    # ------------------------------------------------------------------
+    # 1. Under-15s can never carry an adult role.
+    # ------------------------------------------------------------------
+    bad_child = (c["agep"] < 15) & (~c["rlhp"].isin(_RLHP_CHILD_VALID))
+    ops["under15_to_child"] = int(bad_child.sum())
+    c.loc[bad_child, "rlhp"] = RLHP_CHILD_UNDER_15
+
+    # ------------------------------------------------------------------
+    # 2. One-person households are lone persons; a lone child is retained
+    #    as a child and reported, because it cannot be made a relationship.
+    # ------------------------------------------------------------------
+    size = c.groupby("abshid", sort=False)["abshid"].transform("size")
+    one = size == 1
+    one_adult = one & (c["agep"] >= _RLHP_ADULT_AGE) & (c["rlhp"] != RLHP_NON_FAMILY)
+    ops["one_person_to_lone"] = int(one_adult.sum())
+    c.loc[one_adult, "rlhp"] = RLHP_NON_FAMILY
+    one_child = one & (c["agep"] < _RLHP_ADULT_AGE) & (c["rlhp"] != RLHP_CHILD_UNDER_15)
+    ops["one_person_child_to_child"] = int(one_child.sum())
+    c.loc[one_child, "rlhp"] = RLHP_CHILD_UNDER_15
+
+    # ------------------------------------------------------------------
+    # 3. Keep at most one couple per household.  The two oldest adult
+    #    partners stay; surplus partners take a valid non-partner role.
+    # ------------------------------------------------------------------
+    hh = c["abshid"]
+    is_partner = c["rlhp"] == RLHP_PARTNER
+    partner_age = c["agep"].where(is_partner)
+    rank = partner_age.groupby(hh).rank(method="first", ascending=False)
+    keep = is_partner & (rank <= 2) & (c["agep"] >= _RLHP_ADULT_AGE)
+    # A single adult partner is not a couple: require exactly two kept partners
+    # per household, otherwise all partners in that household are surplus.
+    n_keep = keep.groupby(hh).transform("sum")
+    keep = keep & (n_keep == 2)
+    extra = is_partner & (~keep)
+    has_child_hh = ((c["agep"] < 15)
+                    | c["rlhp"].isin([RLHP_CHILD_UNDER_15,
+                                      RLHP_DEPENDENT_STUDENT,
+                                      RLHP_NON_DEPENDENT_CHILD])
+                    ).groupby(hh).transform("any")
+    if extra.any():
+        max_keep_age = partner_age.where(keep).groupby(hh).transform("max")
+        # Default: non-family.  Other-related is used first while that target
+        # cell is short; a clearly younger adult in a child household can be a
+        # non-dependent child, but only while that cell is short as well.
+        new_role = pd.Series(RLHP_NON_FAMILY, index=c.index)
+        n_other = int(min(max(need(RLHP_OTHER_RELATED), 0), extra.sum()))
+        n_child = int(min(max(need(RLHP_NON_DEPENDENT_CHILD), 0), extra.sum()))
+        if n_other:
+            new_role.loc[c.index[extra][:n_other]] = RLHP_OTHER_RELATED
+        if n_child:
+            young = extra & has_child_hh & (c["agep"] >= 15) & (
+                (max_keep_age - c["agep"]) >= 15)
+            ids = c.index[young][:n_child]
+            new_role.loc[ids] = RLHP_NON_DEPENDENT_CHILD
+        new_role.loc[extra & (c["agep"] < 15)] = RLHP_CHILD_UNDER_15
+        under18 = extra & (c["agep"] >= 15) & (c["agep"] < _RLHP_ADULT_AGE)
+        new_role.loc[under18 & has_child_hh] = RLHP_OTHER_RELATED
+        c.loc[extra, "rlhp"] = new_role.loc[extra]
+        ops["partner_roles_reduced"] = int(extra.sum())
+    else:
+        ops["partner_roles_reduced"] = 0
+
+    # ------------------------------------------------------------------
+    # 4. A lone parent without a child is not a lone parent.
+    # ------------------------------------------------------------------
+    has_child = ((c["agep"] < 15)
+                 | c["rlhp"].isin([RLHP_CHILD_UNDER_15,
+                                   RLHP_DEPENDENT_STUDENT,
+                                   RLHP_NON_DEPENDENT_CHILD])
+                 ).groupby(hh).transform("any")
+    bad_lone = (c["rlhp"] == RLHP_LONE_PARENT) & (~has_child)
+    if bad_lone.any():
+        n_other = int(min(max(need(RLHP_OTHER_RELATED), 0), bad_lone.sum()))
+        c.loc[bad_lone, "rlhp"] = RLHP_NON_FAMILY
+        if n_other:
+            c.loc[c.index[bad_lone][:n_other], "rlhp"] = RLHP_OTHER_RELATED
+        ops["lone_parent_without_child"] = int(bad_lone.sum())
+    else:
+        ops["lone_parent_without_child"] = 0
+
+    # ------------------------------------------------------------------
+    # 5. A child household must contain a parent.  The oldest adult
+    #    relative/non-family member becomes the lone parent.
+    # ------------------------------------------------------------------
+    has_parent = c["rlhp"].isin([RLHP_PARTNER, RLHP_LONE_PARENT]
+                                ).groupby(hh).transform("any")
+    need_parent = has_child & (~has_parent)
+    child_age = c["agep"].where(has_child)
+    youngest_child = child_age.groupby(hh).transform("min")
+    can_parent = (need_parent & (c["agep"] >= _RLHP_ADULT_AGE)
+                  & (c["agep"] >= youngest_child + 15)
+                  & c["rlhp"].isin([RLHP_NON_DEPENDENT_CHILD,
+                                    RLHP_OTHER_RELATED,
+                                    RLHP_NON_FAMILY,
+                                    RLHP_NOT_CLASSIFIABLE]))
+    if can_parent.any():
+        prank = c["agep"].where(can_parent).groupby(hh).rank(
+            method="first", ascending=False)
+        fix_parent = can_parent & (prank == 1)
+        c.loc[fix_parent, "rlhp"] = RLHP_LONE_PARENT
+        ops["child_household_parented"] = int(fix_parent.sum())
+    else:
+        ops["child_household_parented"] = 0
+
+    # ------------------------------------------------------------------
+    # 6. Dependent students and non-dependent children need a parent.
+    # ------------------------------------------------------------------
+    has_parent = c["rlhp"].isin([RLHP_PARTNER, RLHP_LONE_PARENT]
+                                ).groupby(hh).transform("any")
+    has_family = c["rlhp"].isin([RLHP_CHILD_UNDER_15,
+                                 RLHP_DEPENDENT_STUDENT,
+                                 RLHP_NON_DEPENDENT_CHILD,
+                                 RLHP_OTHER_RELATED]
+                                ).groupby(hh).transform("any")
+    dep_bad = (c["rlhp"] == RLHP_DEPENDENT_STUDENT) & (~has_parent)
+    dom_bad = (c["rlhp"] == RLHP_NON_DEPENDENT_CHILD) & (~has_parent)
+    if dep_bad.any() or dom_bad.any():
+        # A student with a sibling but no parent becomes other-related; an
+        # unrelated adult becomes a non-family member.
+        c.loc[dep_bad & has_family, "rlhp"] = RLHP_OTHER_RELATED
+        c.loc[dep_bad & (~has_family), "rlhp"] = RLHP_NON_FAMILY
+        c.loc[dom_bad & has_family, "rlhp"] = RLHP_OTHER_RELATED
+        c.loc[dom_bad & (~has_family), "rlhp"] = RLHP_NON_FAMILY
+        ops["dep_student_without_parent"] = int(dep_bad.sum())
+        ops["non_dependent_without_parent"] = int(dom_bad.sum())
+    else:
+        ops["dep_student_without_parent"] = 0
+        ops["non_dependent_without_parent"] = 0
+
+    # ------------------------------------------------------------------
+    # 7. If partners are still over target and lone parents are short,
+    #    turn a child-household couple into a lone parent plus a relative.
+    #    This is only done while both cells are short, so it never creates a
+    #    new partner deficit.
+    # ------------------------------------------------------------------
+    n_couple = 0
+    surplus_partner = -need(RLHP_PARTNER)
+    deficit_lone = need(RLHP_LONE_PARENT)
+    if surplus_partner > 0 and deficit_lone > 0:
+        limit = int(min(surplus_partner / 2.0, deficit_lone))
+        partner_count = (c["rlhp"] == RLHP_PARTNER).groupby(hh).transform("sum")
+        eligible = (partner_count == 2) & has_child
+        for hh_id in pd.Series(hh[eligible].unique()):
+            if n_couple >= limit:
+                break
+            idx = c.index[(hh == hh_id) & (c["rlhp"] == RLHP_PARTNER)]
+            if len(idx) != 2:
+                continue
+            idx = idx[np.argsort(-c.loc[idx, "agep"].to_numpy())]
+            parent, other = idx[0], idx[1]
+            gap = int(c.at[parent, "agep"] - c.at[other, "agep"])
+            c.at[parent, "rlhp"] = RLHP_LONE_PARENT
+            if gap >= 15 and need(RLHP_NON_DEPENDENT_CHILD) > 0:
+                c.at[other, "rlhp"] = RLHP_NON_DEPENDENT_CHILD
+            elif need(RLHP_OTHER_RELATED) > 0:
+                c.at[other, "rlhp"] = RLHP_OTHER_RELATED
+            else:
+                c.at[other, "rlhp"] = RLHP_NON_FAMILY
+            n_couple += 1
+    ops["couples_to_lone_parent"] = n_couple
+
+    # ------------------------------------------------------------------
+    # 8. Fill the dependent-student deficit from existing students aged
+    #    15--24 who live with a parent.  Never invent students.
+    # ------------------------------------------------------------------
+    n_promoted = 0
+    if "stup" in c.columns:
+        deficit4 = int(round(need(RLHP_DEPENDENT_STUDENT)))
+        if max_promotions is not None:
+            deficit4 = min(deficit4, int(max_promotions))
+        if deficit4 > 0:
+            parent_hh = set(c.loc[c["rlhp"].isin([RLHP_PARTNER,
+                                                  RLHP_LONE_PARENT]),
+                                  "abshid"].unique())
+            elig = ((c["agep"] >= 15)
+                    & (c["agep"] <= _RLHP_DEPENDENT_STUDENT_MAX_AGE)
+                    & c["rlhp"].isin([RLHP_NON_DEPENDENT_CHILD,
+                                      RLHP_OTHER_RELATED,
+                                      RLHP_NON_FAMILY])
+                    & c["abshid"].isin(parent_hh)
+                    & pd.to_numeric(c["stup"], errors="coerce").isin([2, 3, 4]))
+            ids = c.index[elig]
+            if len(ids):
+                # Younger dependent students first; a 25--29 student is not a
+                # dependent student under the ABS definition used here.
+                ids = ids[np.argsort(c.loc[ids, "agep"].to_numpy())][:deficit4]
+                c.loc[ids, "rlhp"] = RLHP_DEPENDENT_STUDENT
+                n_promoted = len(ids)
+    ops["students_to_dependent"] = n_promoted
+
+    # ------------------------------------------------------------------
+    # 9. Reclassify the remaining role surplus into cells the target needs
+    #    but the household structure leaves empty.  Both moves keep the
+    #    household valid:
+    #      * a non-dependent child (5) can be an other relative (6);
+    #      * a non-family adult (7) can be non-classifiable (9), provided
+    #        the household keeps another adult.
+    #    Code 10 ("not applicable") is not used: it describes people outside
+    #    private households, not a relationship a resident can take.
+    # ------------------------------------------------------------------
+    n_5to6 = 0
+    deficit6 = int(round(need(RLHP_OTHER_RELATED)))
+    if deficit6 > 0:
+        # Never take the only child away from a lone parent: a 5 in a
+        # lone-parent household is that parent's child, not a spare relative.
+        has_lone_hh = (c["rlhp"] == RLHP_LONE_PARENT).groupby(hh).transform("any")
+        surplus5 = (c["rlhp"] == RLHP_NON_DEPENDENT_CHILD) & (~has_lone_hh)
+        if surplus5.any():
+            ids = c.index[surplus5][:deficit6]
+            c.loc[ids, "rlhp"] = RLHP_OTHER_RELATED
+            n_5to6 = len(ids)
+    ops["non_dependent_to_other_related"] = n_5to6
+
+    n_7to9 = 0
+    deficit9 = int(round(need(RLHP_NOT_CLASSIFIABLE)))
+    if deficit9 > 0:
+        # Only adults in multi-person households, and never the last adult.
+        n_adults = (c["agep"] >= _RLHP_ADULT_AGE).groupby(hh).transform("sum")
+        surplus7 = ((c["rlhp"] == RLHP_NON_FAMILY)
+                    & (c["agep"] >= _RLHP_ADULT_AGE)
+                    & (n_adults > 1))
+        if surplus7.any():
+            ids = c.index[surplus7][:deficit9]
+            c.loc[ids, "rlhp"] = RLHP_NOT_CLASSIFIABLE
+            n_7to9 = len(ids)
+    ops["non_family_to_non_classifiable"] = n_7to9
+
+    after = rlhp_structure_violations(c)
+    tvd_after = _rlhp_tvd_values(c["rlhp"], share)
+    role7 = c["rlhp"].where(c["rlhp"].isin(hh_share))
+    tvd_hh_after = _rlhp_tvd_values(role7.dropna(), hh_share)
+
+    cur = c["rlhp"].value_counts().to_dict()
+    gaps = {int(k): round(tgt_n.get(k, 0.0) - cur.get(k, 0), 1)
+            for k in sorted(set(tgt_n) | set(cur))}
+    report = {
+        "persons": int(n_persons),
+        "households": int(c["abshid"].nunique()),
+        "operations": ops,
+        "rlhp_tvd_before": round(float(tvd_before), 6),
+        "rlhp_tvd_after": round(float(tvd_after), 6),
+        "rlhp_household_tvd_before": round(float(tvd_hh_before), 6),
+        "rlhp_household_tvd_after": round(float(tvd_hh_after), 6),
+        "target_gap_persons": gaps,
+        "violations_before": before,
+        "violations_after": after,
+    }
+    return c, report
+
+
+
 def fit_zone(pool, targets, ind_keys, hh_keys, tol0=0.05,
              relax_factor=2.0, max_relax=5, time_limit=None,
              allow_lp_fallback=True, hh_tol_mult=2.0, abs_floor=2.0,
@@ -1055,6 +1451,9 @@ def main():
     ap.add_argument("--solver", choices=["auto", "mip", "lp"], default="auto",
                     help="auto (default) uses MIP with LP fallback; lp forces "
                          "the LP relaxation followed by integerisation")
+    ap.add_argument("--no-rlhp-repair", action="store_true",
+                    help="Skip the structural relationship-in-household role "
+                         "repair (partners, lone parents, dependent students)")
     ap.add_argument("--results-dir", default=None,
                     help="Override output directory (production default unchanged)")
     a = ap.parse_args()
@@ -1129,6 +1528,17 @@ def main():
         audit_base["household_bands_shifted"] = shifted
         if any(shifted.values()):
             print(f"Zone {zone}: band shifts {shifted}")
+        if not a.no_rlhp_repair:
+            cand, rlhp_report = repair_rlhp_structure(cand, tgt)
+            audit_base["rlhp_repair"] = rlhp_report
+            if rlhp_report:
+                r = rlhp_report
+                print(f"Zone {zone}: RLHP repair "
+                      f"TVD {r['rlhp_tvd_before']:.4f}->{r['rlhp_tvd_after']:.4f}, "
+                      f"household-role TVD "
+                      f"{r['rlhp_household_tvd_before']:.4f}->"
+                      f"{r['rlhp_household_tvd_after']:.4f}, "
+                      f"ops {r['operations']}")
         # Bound the program: person target = largest person-table total.
         _person_totals = {}
         for (attr, _cat), cnt in tgt.items():
