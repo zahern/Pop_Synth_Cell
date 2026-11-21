@@ -459,10 +459,14 @@ cells, whereas field of study has more zero cells (681) but only 0.3\% of its
 target mass. That is why the carrier column moves the first two tables more
 than the last. The donor-balanced column is the balance track: whole census
 households are scored by their net reduction in the final weighted deviation
-and added up to a 10\% person budget. It lowers the relative TVD for every
-table, with the largest gains in mortgage repayment (9.9\% to 9.2\%), rent
-(11.0\% to 10.3\%), vehicles (11.9\% to 11.2\%) and household income (30.6\% to
-29.7\%). The cohort mean falls from 0.1053 to 0.1015.
+and added iteratively in 5\% batches up to a 100\% person budget. It lowers the
+relative TVD for every table, with the largest gains in highest education
+(11.7\% to 8.6\%), field of study (6.9\% to 3.7\%), occupation (6.6\% to
+3.3\%), qualification level (6.9\% to 3.0\%) and hours worked (5.4\% to 2.7\%).
+The cohort mean falls from 0.1053 to 0.0816. Household income, relationship in
+household and dwelling structure remain higher because the observed donor pool
+is itself skewed; the fit-time dwelling-structure band shift addresses the last
+of these.
 
 \begin{figure}[H]
 \centering
@@ -477,9 +481,10 @@ better. The right-hand columns give the share of the table's census target that
 sits in zero-capacity cells---the part the carrier stage has to add rather than
 reweight---and the number of such cells. The final column is the donor-balanced
 pool: whole census households scored by their net reduction in the final
-weighted marginal deviation and added up to a 10\% person budget. It lowers the
-relative TVD for every table (student status is unchanged), with the largest
-gains in mortgage repayment, rent, vehicles and household income.}
+weighted marginal deviation and added iteratively in 5\% batches up to a 100\%
+person budget. It lowers the relative TVD for every table, with the largest
+gains in highest education, field of study, occupation, qualification level and
+hours worked.}
 \label{fig:pool_stage_heatmap}
 \end{figure}
 
