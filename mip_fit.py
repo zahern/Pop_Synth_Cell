@@ -755,6 +755,15 @@ def shift_household_band(cand, targets, table="strd"):
                     if rent == 27 or mort == 23:
                         safe.append(hh_id)
                 ids = safe
+            if table == "hind" and code == 1:
+                # Negative income cannot coexist with an active mortgage.
+                safe = []
+                for hh_id in ids:
+                    sub = cand[cand["abshid"] == hh_id]
+                    mort = sub.get("mrerd", pd.Series([23])).iloc[0]
+                    if mort == 23:
+                        safe.append(hh_id)
+                ids = safe
             take = ids[:min(need, surplus, len(ids))]
             if not take:
                 continue
@@ -1113,10 +1122,13 @@ def main():
                   f"({n_bad_rows} rows), candidates={how}")
         audit_base["inconsistent_households_repaired"] = n_bad_hh
         audit_base["inconsistent_person_rows_repaired"] = n_bad_rows
-        cand, n_strd_shift = shift_household_band(cand, tgt, "strd")
-        audit_base["strd_households_shifted"] = int(n_strd_shift)
-        if n_strd_shift:
-            print(f"Zone {zone}: shifted STRD on {n_strd_shift} households")
+        shifted = {}
+        for table in ("strd", "hind", "vehrd"):
+            cand, n_shift = shift_household_band(cand, tgt, table)
+            shifted[table] = int(n_shift)
+        audit_base["household_bands_shifted"] = shifted
+        if any(shifted.values()):
+            print(f"Zone {zone}: band shifts {shifted}")
         # Bound the program: person target = largest person-table total.
         _person_totals = {}
         for (attr, _cat), cnt in tgt.items():
