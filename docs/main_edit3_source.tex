@@ -876,7 +876,12 @@ carries into a margin it was not asked to match. The base microdata means are
 mean (0.099), the CP pool with SA is 0.104, and the expanded pool with MIP is
 0.190. The MIP fit is therefore the best on pooled marginal distance but not on
 held-out error; the SA fit generalises better, and construction does not
-improve held-out accuracy over the raw microdata.
+improve held-out accuracy over the raw microdata.  With the structural
+relationship repair and the visitors-only cap, held-out error falls further:
+0.0436 for the CP pool and 0.0420 for the donor-balanced pool
+(\cref{tab:fit_repair}), below every six-configuration row of
+\cref{tab:fit_quality}.  The repair therefore improves held-out accuracy as
+well as marginal fit.
 
 
 
@@ -1114,7 +1119,18 @@ joint cost is stated as a finding rather than a caveat.
 
 The study demonstrates that candidate-pool support is a first-order determinant of synthetic-population quality. Constructing a cell-complete pool is not sufficient if zone-specific targets remain unreachable. By explicitly auditing support deficits and repairing them before fitting, the proposed framework converts previously unattainable census targets into selectable alternatives, improving marginal fidelity while exposing a measurable trade-off with joint structure preservation. The unified CP--MIP method implements that sequence: constraint-guided construction, mixed-integer expansion, and a zone-level fitting MIP, solved in order on a common 362-zone cohort so that support is established before any fitting begins.
 
-The reported configuration has a 19-table median of 0.0388 and a held-out mean of 0.190. The expanded pool is the only route by which categories such as mixed-field study and overseas visitors enter the fitted population, and the MIP fit gives the lowest pooled marginal distance (0.0249). The SA fit remains the best on held-out error (0.099), so the fit metrics are reported as a profile rather than a single ranking.
+The six-configuration comparison has a 19-table median of 0.0388 and a
+held-out mean of 0.190 for the expanded pool with the MIP fit; the SA fit
+remains the best on held-out error (0.099), so those fit metrics are reported
+as a profile rather than a single ranking.  With the structural relationship
+repair and the visitors-only cap, the donor-balanced pool reaches a median of
+0.0106, a mean of 0.0151, a pooled TVD of 0.0170 and a held-out mean of 0.0420
+(\cref{tab:fit_repair}), at a joint TVD of 0.2346 against 0.2317 for the CP
+pool.  That joint cost is larger than the expanded MIP's 0.216
+(\cref{tab:full_audit}), so the repair-stage fit is a marginal-fidelity
+choice, not a joint-structure improvement.  The repair-stage fit is therefore
+the best marginal profile in the study, but it is reported separately because
+it also changes candidate preparation and uses the corrected controls.
 
 Support restoration is achieved without abandoning explicit feasibility. All constructed and expanded households satisfy the census rule set, structural zeros remain fixed at zero, and unsupported cells are reported rather than fabricated. The expansion process therefore acts as a controlled mechanism for increasing support while preserving household structure and making residual limitations visible to the modeller.
 
