@@ -686,7 +686,18 @@ coverage.}
 \cref{fig:rssz_by_arm} shows the full per-zone 19-table RSSZ distribution
 for the base microdata, the two pools and four fitting methods.
 
+The candidate set for each zone is thinned before the program is built.  The
+donor block carries thousands of visitors-only or non-classifiable dwellings
+(NPRD${}=7$), whereas the census marginal asks for only a trace number.  Left
+uncapped, the integer program uses them as cheap carriers of visitor
+relationship codes and the dwelling-size table absorbs the error.  The fit
+therefore keeps at most $\max(20, 3\hat n_{\mathrm{NPRD}=7})$ such dwellings
+per zone: enough to meet the target with replication and a margin, but not
+enough to dominate the solution.
+
 \input{files/fit_quality.tex}
+
+\input{files/fit_repair.tex}
 
 \begin{figure}[H]
 \centering
