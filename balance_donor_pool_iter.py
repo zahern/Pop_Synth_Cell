@@ -145,8 +145,15 @@ def select_zone(cp, census, zone, ind, hh, ind_keys, hh_keys, sa2_to_reg,
         g = cand[cand["abshid"] == ids_arr[j]]
         if not len(g):
             continue
-        for _ in range(int(n[j])):
-            pieces.append(g)
+        # Each replica must become its own household.  Appending the same
+        # frame n[j] times and re-keying by the original abshid collapses the
+        # replicas into one oversized household (the downstream fit then sees
+        # a 15-person dwelling whose NPRD says 3).  Give every replica a
+        # distinct placeholder id; main() maps the placeholders to ints.
+        for rep in range(int(n[j])):
+            g2 = g.copy()
+            g2["abshid"] = f"{ids_arr[j]}_{rep}"
+            pieces.append(g2)
     if not pieces:
         return None
     block = pd.concat(pieces, ignore_index=True)
