@@ -9,8 +9,10 @@ median 0.0127 and mean 0.0201; the donor-balanced pool lowers these to 0.0106
 and 0.0151 and is better in 286 of 362 paired zones.  The 5\% trimmed mean
 falls from 0.0151 to 0.0126 and the 95th percentile from 0.0433 to 0.0375, so
 the gain is not confined to the tail; only three zones are worse by more than
-0.01.  Every control table has a lower mean RSSZ except hours worked, dwelling
-structure and mortgage repayment, where the absolute change is below 0.0001.
+0.01.  \Cref{fig:repair_rssz,fig:repair_paired} show the full distribution and
+the paired pool comparison.  Every control table has a lower mean RSSZ except
+hours worked, dwelling structure and mortgage repayment, where the absolute
+change is below 0.0001.
 The largest reductions are in personal income, travel to work, field of study,
 qualification level, household income and education institution.
 Pooled TVD falls from 0.0184 to 0.0170 and held-out RSSZ from 0.0436 to 0.0420.
@@ -41,3 +43,26 @@ Donor-balanced + repair   & \textbf{0.0106} & \textbf{0.0151} & \textbf{0.0170} 
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{fig_repair_rssz.png}
+\caption{Per-zone 19-table RSSZ for the base microdata, the earlier CP-MIP
+pipeline and the two repair-stage arms on the 362-zone cohort.  Curves further
+left are better.  The base SA curve covers 325 zones; every other arm covers
+362.  The repair-stage arms use the corrected controls, the structural
+relationship repair and the visitors-only cap.}
+\label{fig:repair_rssz}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig_repair_paired.png}
+\caption{Paired per-zone RSSZ for the CP and donor-balanced pools under the
+repair-stage method, and the per-table mean difference.  Points below the
+diagonal in (a) are zones where the donor pool improves the fit; it improves
+286 of 362 zones, with a mean change of $-0.0050$.  In (b), blue bars are
+improvements and red bars regressions; the three red bars are all below 0.0001
+in absolute RSSZ.}
+\label{fig:repair_paired}
+\end{figure}
