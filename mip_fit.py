@@ -1157,6 +1157,25 @@ def repair_rlhp_structure(cand, targets, max_promotions=None):
             n_7to9 = len(ids)
     ops["non_family_to_non_classifiable"] = n_7to9
 
+    # ------------------------------------------------------------------
+    # 10. A household of children with no adult cannot be made valid by
+    #     relabelling: there is no one to be the parent or guardian.  These
+    #     are person-sampling residuals in the candidate pool, so drop the
+    #     whole household rather than emit an impossible dwelling.
+    # ------------------------------------------------------------------
+    g = c.groupby("abshid", sort=False)
+    has_adult = (c["agep"] >= _RLHP_ADULT_AGE).groupby(c["abshid"]).transform("any")
+    has_child = ((c["agep"] < 15)
+                 | c["rlhp"].isin([RLHP_CHILD_UNDER_15,
+                                   RLHP_DEPENDENT_STUDENT,
+                                   RLHP_NON_DEPENDENT_CHILD])
+                 ).groupby(c["abshid"]).transform("any")
+    child_only = has_child & (~has_adult)
+    n_dropped = int(c.loc[child_only, "abshid"].nunique())
+    if n_dropped:
+        c = c.loc[~child_only].reset_index(drop=True)
+    ops["child_only_households_dropped"] = n_dropped
+
     after = rlhp_structure_violations(c)
     tvd_after = _rlhp_tvd_values(c["rlhp"], share)
     role7 = c["rlhp"].where(c["rlhp"].isin(hh_share))

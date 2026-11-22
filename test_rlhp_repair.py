@@ -69,6 +69,14 @@ def test_child_household_gets_a_parent():
     assert rep["violations_after"]["child_household_without_parent"] == 0
 
 
+def test_child_only_household_is_dropped():
+    df = _frame([("h", 3, 8), ("h", 3, 10)])
+    tgt = _targets({3: 1.0})
+    out, rep = mf.repair_rlhp_structure(df, tgt)
+    assert len(out) == 0
+    assert rep["operations"]["child_only_households_dropped"] == 1
+
+
 def test_under15_never_becomes_partner():
     df = _frame([("h", 1, 10), ("h", 1, 40), ("h", 1, 38)])
     tgt = _targets({1: 0.50, 3: 0.50})
