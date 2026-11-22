@@ -750,6 +750,13 @@ def shift_household_band(cand, targets, table="strd"):
     n_hh = len(hh)
     if n_hh == 0:
         return cand, 0
+    # Household-level tenure lookups, built once.  The guards below need one
+    # rent and one mortgage value per household; indexing the frame inside the
+    # partner loop made the pass O(n^2) and hung on a 65k-household CP slice.
+    hh_rent = (cand.groupby("abshid")["rntrd"].first()
+               if "rntrd" in cand.columns else None)
+    hh_mort = (cand.groupby("abshid")["mrerd"].first()
+               if "mrerd" in cand.columns else None)
     total = sum(target.values())
     target_count = {c: int(round(v / total * n_hh)) for c, v in target.items()}
     cur = hh.value_counts().to_dict()
@@ -769,23 +776,14 @@ def shift_household_band(cand, targets, table="strd"):
             ids = hh.index[hh == src].tolist()
             if code == 6:
                 # Prefer households without an active rent+mortgage pair.
-                safe = []
-                for hh_id in ids:
-                    sub = cand[cand["abshid"] == hh_id]
-                    rent = sub.get("rntrd", pd.Series([27])).iloc[0]
-                    mort = sub.get("mrerd", pd.Series([23])).iloc[0]
-                    if rent == 27 or mort == 23:
-                        safe.append(hh_id)
-                ids = safe
+                if hh_rent is not None and hh_mort is not None:
+                    ids = [h for h in ids
+                           if hh_rent.get(h, 27) == 27
+                           or hh_mort.get(h, 23) == 23]
             if table == "hind" and code == 1:
                 # Negative income cannot coexist with an active mortgage.
-                safe = []
-                for hh_id in ids:
-                    sub = cand[cand["abshid"] == hh_id]
-                    mort = sub.get("mrerd", pd.Series([23])).iloc[0]
-                    if mort == 23:
-                        safe.append(hh_id)
-                ids = safe
+                if hh_mort is not None:
+                    ids = [h for h in ids if hh_mort.get(h, 23) == 23]
             take = ids[:min(need, surplus, len(ids))]
             if not take:
                 continue
