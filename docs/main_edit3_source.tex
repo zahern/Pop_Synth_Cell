@@ -1131,6 +1131,10 @@ pool.  That joint cost is larger than the expanded MIP's 0.216
 choice, not a joint-structure improvement.  The repair-stage fit is therefore
 the best marginal profile in the study, but it is reported separately because
 it also changes candidate preparation and uses the corrected controls.
+Fitting the same prepared pool with SA or IPU does not reproduce the gain: SA
+reaches median 0.0524 and IPU 0.0990, against 0.0106 for the integer program.
+The repair-stage result therefore depends on the fitting method as well as the
+pool.
 
 Support restoration is achieved without abandoning explicit feasibility. All constructed and expanded households satisfy the census rule set, structural zeros remain fixed at zero, and unsupported cells are reported rather than fabricated. The expansion process therefore acts as a controlled mechanism for increasing support while preserving household structure and making residual limitations visible to the modeller.
 

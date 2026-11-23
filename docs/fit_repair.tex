@@ -9,8 +9,9 @@ median 0.0127 and mean 0.0201; the donor-balanced pool lowers these to 0.0106
 and 0.0151 and is better in 286 of 362 paired zones.  The 5\% trimmed mean
 falls from 0.0151 to 0.0126 and the 95th percentile from 0.0433 to 0.0375, so
 the gain is not confined to the tail; only three zones are worse by more than
-0.01.  \Cref{fig:repair_rssz,fig:repair_paired} show the full distribution and
-the paired pool comparison.  Every control table has a lower mean RSSZ except
+0.01.  \Cref{fig:repair_rssz,fig:repair_paired} show the full distribution, the
+paired pool comparison and the fitter comparison.  Every control table has a
+lower mean RSSZ except
 hours worked, dwelling structure and mortgage repayment, where the absolute
 change is below 0.0001.
 The largest reductions are in personal income, travel to work, field of study,
@@ -22,6 +23,38 @@ profile.  The remaining residual is concentrated in student status and
 relationship in household.  For relationship, part of the target is overseas
 visitors outside the private-dwelling pool; in the six-zone pilot the fitted
 RLHP TVD was 6.25\% on all categories but 2.50\% on the resident universe.
+
+\paragraph{SA and IPU on the same pool.}
+To separate the pool from the integer program, the same prepared pool was also
+fitted with the SA and IPU implementations used in the six-configuration
+comparison.  \Cref{tab:fit_fitters} reports the result.  SA covers all 362 zones
+with median 0.0524 and mean 0.0615: it improves the earlier CP-MIP mean
+(0.1014) but not its median (0.0388), so the larger repaired pool does not help
+the typical SA zone.  IPU covers 325 zones with median 0.0990 and mean 0.1222;
+37 large zones are missing because the IPU implementation replicates households
+until the output becomes intractable, even with a 32 GB allocation.  The integer
+program is therefore the only fitter that converts the repaired pool into a
+low-RSSZ population: its median is five times lower than SA and ten times lower
+than IPU.  The SA and IPU rows are not pooled into the marginal and joint
+columns because their coverage differs.
+
+\begin{table}[H]
+\centering
+\caption{Fitter comparison on the new donor-balanced pool.  All three fitters
+use the same prepared pool and the corrected controls.  SA and the MIP cover 362
+zones; IPU covers 325 because its replication is intractable in 37 large zones.}
+\label{tab:fit_fitters}
+\footnotesize
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Fitter & Zones & 19-table median & 19-table mean \\
+\midrule
+MIP & 362 & \textbf{0.0106} & \textbf{0.0151} \\
+IPU & 325 & 0.0990 & 0.1222 \\
+SA  & 362 & 0.0524 & 0.0615 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{table}[H]
 \centering
@@ -48,10 +81,11 @@ Donor-balanced + repair   & \textbf{0.0106} & \textbf{0.0151} & \textbf{0.0170} 
 \centering
 \includegraphics[width=0.9\textwidth]{fig_repair_rssz.png}
 \caption{Per-zone 19-table RSSZ for the base microdata, the earlier CP-MIP
-pipeline and the two repair-stage arms on the 362-zone cohort.  Curves further
-left are better.  The base SA curve covers 325 zones; every other arm covers
-362.  The repair-stage arms use the corrected controls, the structural
-relationship repair and the visitors-only cap.}
+pipeline, and the SA, IPU and MIP fits on the new donor-balanced pool.  Curves
+further left are better.  Base SA covers 325 zones; base IPU, the MIP and SA
+cover 362; IPU covers 325 because 37 large zones are intractable.  The
+repair-stage arms use the corrected controls, the structural relationship
+repair and the visitors-only cap.}
 \label{fig:repair_rssz}
 \end{figure}
 
